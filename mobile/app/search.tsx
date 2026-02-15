@@ -142,27 +142,33 @@ export default function SearchScreen() {
                 {/* Results */}
                 {result && (
                     <View style={styles.resultContainer}>
-
-                        {/* Confidence + Metadata */}
-                        <View style={styles.metaRow}>
+                        {/* Summary Header */}
+                        <View style={styles.summaryHeader}>
                             <ConfidenceBadge confidence={result.confidence} />
-                            <Text style={styles.meta}>{result.latency_ms}ms · {result.tokens_used} tokens</Text>
+                            <Text style={styles.metricsText}>
+                                {result.latency_ms}ms • {result.tokens_used} tokens
+                            </Text>
                         </View>
 
-                        {/* Answer */}
-                        <Text style={styles.answerLabel}>Answer</Text>
-                        <Text style={styles.answerText}>{result.answer}</Text>
+                        {/* AI Answer Section */}
+                        <View style={styles.answerSection}>
+                            <View style={styles.sectionHeader}>
+                                <Text style={styles.sectionLabel}>AI ANSWER</Text>
+                                <Text style={styles.sparkleIcon}>✨</Text>
+                            </View>
+                            <Text style={styles.answerText}>{result.answer}</Text>
+                        </View>
 
-                        {/* Citations */}
+                        {/* Sources Section */}
                         {result.citations.length > 0 && (
-                            <>
-                                <Text style={styles.citationsLabel}>
-                                    Sources ({result.citations.length})
-                                </Text>
-                                {result.citations.map((c: Citation, i: number) => (
-                                    <CitationCard key={i} citation={c} index={i} />
-                                ))}
-                            </>
+                            <View style={styles.sourcesSection}>
+                                <Text style={styles.sectionLabel}>SOURCES ({result.citations.length})</Text>
+                                <View style={styles.citationsList}>
+                                    {result.citations.map((c: Citation, i: number) => (
+                                        <CitationCard key={i} citation={c} index={i} />
+                                    ))}
+                                </View>
+                            </View>
                         )}
                     </View>
                 )}
@@ -206,24 +212,58 @@ const styles = StyleSheet.create({
     errorBox: { backgroundColor: "#450a0a", borderRadius: 8, padding: 12, marginBottom: 16 },
     errorText: { color: "#fca5a5", fontSize: 14 },
 
-    resultContainer: { gap: 12 },
+    resultContainer: { gap: 16, marginTop: 8 },
 
-    metaRow: { flexDirection: "row", alignItems: "center", gap: 12, marginBottom: 8 },
+    summaryHeader: {
+        flexDirection: "row",
+        alignItems: "center",
+        justifyContent: "space-between",
+        marginBottom: 8,
+    },
+    metricsText: {
+        color: "#64748b",
+        fontSize: 12,
+        fontWeight: "500",
+    },
+
     badge: { borderRadius: 6, paddingHorizontal: 10, paddingVertical: 4 },
     badgeText: { color: "#fff", fontSize: 11, fontWeight: "700", letterSpacing: 0.5 },
-    meta: { color: "#64748b", fontSize: 13 },
 
-    answerLabel: { fontSize: 13, fontWeight: "600", color: "#94a3b8", textTransform: "uppercase", letterSpacing: 1 },
-    answerText: { fontSize: 15, color: "#e2e8f0", lineHeight: 24, marginBottom: 20 },
+    answerSection: {
+        backgroundColor: "rgba(99, 102, 241, 0.1)", // Subtle indigo background
+        borderRadius: 16,
+        padding: 16,
+        borderWidth: 1,
+        borderColor: "rgba(99, 102, 241, 0.2)",
+    },
+    sectionHeader: {
+        flexDirection: "row",
+        alignItems: "center",
+        justifyContent: "space-between",
+        marginBottom: 8,
+    },
+    sectionLabel: {
+        fontSize: 12,
+        fontWeight: "700",
+        color: "#6366f1", // Indigo
+        letterSpacing: 1.2,
+    },
+    sparkleIcon: { fontSize: 16 },
+    answerText: {
+        fontSize: 15,
+        color: "#f1f5f9",
+        lineHeight: 24,
+    },
 
-    citationsLabel: { fontSize: 13, fontWeight: "600", color: "#94a3b8", textTransform: "uppercase", letterSpacing: 1, marginBottom: 8 },
+    sourcesSection: { marginTop: 8 },
+    citationsList: { gap: 10 },
+
     citationCard: {
         backgroundColor: "#1e293b",
-        borderRadius: 10,
+        borderRadius: 12,
         padding: 14,
-        borderLeftWidth: 3,
-        borderLeftColor: "#6366f1",
-        marginBottom: 10,
+        borderWidth: 1,
+        borderColor: "#334155",
     },
     citationHeader: {
         flexDirection: "row",
@@ -231,8 +271,8 @@ const styles = StyleSheet.create({
         alignItems: "center",
         marginBottom: 6,
     },
-    citationNumber: { fontSize: 11, color: "#6366f1", fontWeight: "700", letterSpacing: 0.5 },
+    citationNumber: { fontSize: 11, color: "#94a3b8", fontWeight: "700", letterSpacing: 0.5 },
     linkIcon: { fontSize: 14 },
-    citationTitle: { fontSize: 15, color: "#f1f5f9", fontWeight: "600", marginBottom: 6 },
+    citationTitle: { fontSize: 14, color: "#f1f5f9", fontWeight: "600", marginBottom: 6 },
     citationPreview: { fontSize: 13, color: "#94a3b8", lineHeight: 20 },
 });
