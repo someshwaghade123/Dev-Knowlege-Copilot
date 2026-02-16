@@ -65,6 +65,19 @@ def init_db() -> None:
         )
     """)
 
+    # ── query_logs table (Week 2) ──────────────────────────────────────────
+    cursor.execute("""
+        CREATE TABLE IF NOT EXISTS query_logs (
+            id          INTEGER PRIMARY KEY AUTOINCREMENT,
+            query       TEXT NOT NULL,
+            answer      TEXT NOT NULL,
+            confidence  TEXT,
+            latency_ms  INTEGER,
+            tokens_used INTEGER,
+            timestamp   TEXT DEFAULT (datetime('now'))
+        )
+    """)
+
     conn.commit()
     conn.close()
     print("[DB] Tables initialised.")
@@ -128,3 +141,18 @@ def get_all_documents() -> list[dict]:
     rows = [dict(row) for row in cursor.fetchall()]
     conn.close()
     return rows
+
+
+def insert_query_log(query: str, answer: str, confidence: str,
+                     latency_ms: int, tokens_used: int) -> None:
+    """Store a record of a RAG query and its performance metrics."""
+    conn = get_connection()
+    cursor = conn.cursor()
+    cursor.execute(
+        """INSERT INTO query_logs
+           (query, answer, confidence, latency_ms, tokens_used)
+           VALUES (?, ?, ?, ?, ?)""",
+        (query, answer, confidence, latency_ms, tokens_used),
+    )
+    conn.commit()
+    conn.close()

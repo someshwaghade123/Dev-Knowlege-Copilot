@@ -32,7 +32,7 @@ from pydantic import BaseModel
 
 from backend.retrieval.vector_store import vector_store
 from backend.generation.llm import generate_answer
-from backend.db.models import get_chunks_by_faiss_ids, get_all_documents
+from backend.db.models import get_chunks_by_faiss_ids, get_all_documents, insert_query_log
 from backend.core.config import settings
 
 router = APIRouter()
