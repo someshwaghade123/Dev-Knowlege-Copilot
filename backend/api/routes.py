@@ -136,11 +136,16 @@ async def query_documents(request: QueryRequest):
 
         # ── Step 2: Fetch metadata from SQLite ───────────────────────────────────
         faiss_ids = [r["faiss_id"] for r in filtered]
-        chunks = get_chunks_by_faiss_ids(faiss_ids)
+        raw_chunks = get_chunks_by_faiss_ids(faiss_ids)
 
-        if not chunks:
+        if not raw_chunks:
              # This should not happen if search_results were found
              raise Exception(f"No metadata found for FAISS IDs: {faiss_ids}")
+
+        # CRITICAL: SQL 'IN' doesn't guarantee order. 
+        # We must re-sort raw_chunks to match the order of faiss_ids (relevance).
+        chunks_map = {c["faiss_id"]: c for c in raw_chunks}
+        chunks = [chunks_map[fid] for fid in faiss_ids if fid in chunks_map]
 
         # ── Step 3: Generate answer ──────────────────────────────────────────────
         llm_result = await generate_answer(request.query, chunks)
