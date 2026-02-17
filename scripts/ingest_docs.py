@@ -30,10 +30,11 @@ from pathlib import Path
 # Allow running from project root: python scripts/ingest_docs.py
 sys.path.insert(0, str(Path(__file__).parent.parent))
 
-from backend.db.models import init_db, insert_document, insert_chunk
+from backend.db.models import init_db, insert_document, insert_chunk, get_all_chunks
 from backend.ingestion.chunker import chunk_documents
 from backend.ingestion.embedder import embed_texts
 from backend.retrieval.vector_store import vector_store
+from backend.retrieval.bm25_store import bm25_store
 from backend.core.config import settings
 
 
@@ -146,6 +147,13 @@ def ingest(source: str) -> None:
     # ── 5. Save FAISS index to disk ──────────────────────────────────────────
     print(f"\n[Ingest] Saving vector index...")
     vector_store.save()
+
+    # ── 6. Rebuild BM25 index (Week 3) ────────────────────────────────────────
+    print("\n[Ingest] Rebuilding BM25 keyword index...")
+    all_chunks = get_all_chunks()
+    if all_chunks:
+        bm25_store.build_index(all_chunks)
+        print(f"   OK: BM25 index rebuilt with {len(all_chunks)} chunks")
 
     print(f"\n[Ingest] Ingestion complete!")
     print(f"   Documents: {len(docs)}")

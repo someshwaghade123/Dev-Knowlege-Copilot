@@ -32,6 +32,7 @@ class Settings(BaseSettings):
     base_path: Path = Path(__file__).parent.parent.parent
     faiss_index_path: str = str(base_path / "data" / "faiss_index.bin")
     faiss_metadata_db: str = str(base_path / "data" / "metadata.db")
+    bm25_index_path: str = str(base_path / "data" / "bm25_index.pkl")
 
     # ── Chunking ─────────────────────────────────────────────────────────────
     chunk_size: int = 384       # Tokens per chunk

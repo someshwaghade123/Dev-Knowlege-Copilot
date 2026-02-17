@@ -39,7 +39,7 @@ async def lifespan(app: FastAPI):
     print("[Startup] Loading FAISS vector index...")
     vector_store.load_or_create()
 
-    print("[Startup] ✅ Application ready.")
+    print("[Startup] Application ready.")
     yield   # App serves requests between yield and shutdown
 
     print("[Shutdown] Saving FAISS index to disk...")

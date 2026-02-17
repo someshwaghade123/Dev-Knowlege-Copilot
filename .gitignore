@@ -9,6 +9,7 @@ venv/
 data/faiss_index.bin
 data/metadata.db
 data/ids.npy
+data/*.pkl
 
 # Documentation (Internal)
 docs/
@@ -30,3 +31,6 @@ yarn-error.log*
 # OS
 .DS_Store
 Thumbs.db
+
+# Temporary
+tmp/
