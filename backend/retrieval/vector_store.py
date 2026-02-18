@@ -110,29 +110,32 @@ class VectorStore:
     def search(self, query: str, top_k: int | None = None) -> list[dict]:
         """
         Search the index for chunks closest to the query embedding.
+        Default implementation that includes embedding step.
+        """
+        k = top_k or settings.top_k
+        query_vector = embed_query(query)
+        return self.search_by_vector(query_vector, k)
 
-        Args:
-            query:  Raw user query string (we embed it here)
-            top_k:  Number of results to return (defaults to settings.top_k)
-
-        Returns:
-            List of {"faiss_id": int, "score": float} dicts, sorted by score desc
+    def search_by_vector(self, query_vector: np.ndarray, top_k: int) -> list[dict]:
+        """
+        Search using a pre-computed vector. 
+        Useful for measuring embed vs search latency separately.
         """
         assert self._index is not None, "Call load_or_create() first."
+        
+        # Ensure correct shape (1, dim)
+        if query_vector.ndim == 1:
+            query_vector = query_vector.reshape(1, -1)
 
-        k = top_k or settings.top_k
-        query_vector = embed_query(query).reshape(1, -1)   # Shape: (1, 384)
-
-        scores, indices = self._index.search(query_vector, k)
-        # scores[0] and indices[0] are 1D arrays of length k
+        scores, indices = self._index.search(query_vector, top_k)
 
         results = []
         for score, idx in zip(scores[0], indices[0]):
-            if idx == -1:   # FAISS returns -1 for unfilled slots
+            if idx == -1:
                 continue
             results.append({"faiss_id": int(idx), "score": float(score)})
 
-        return results   # Already sorted by descending score
+        return results
 
 
 # ── Singleton instance ───────────────────────────────────────────────────────

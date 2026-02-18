@@ -141,12 +141,14 @@ async def query_documents(request: QueryRequest):
                 detail="No documents indexed yet. Run ingest_docs.py first."
             )
 
-        # ── Step 1: Hybrid search (Week 3) ───────────────────────────────────────
-        search_results = hybrid_search(
+        # ── Step 1: Hybrid search (Week 3/4) ─────────────────────────────────────
+        search_data = hybrid_search(
             request.query, 
             top_k=request.top_k, 
             search_mode=request.search_mode
         )
+        search_results = search_data["results"]
+        metrics = search_data["metrics"]
 
         # Filter by minimum similarity score
         filtered = [r for r in search_results if r["score"] >= request.min_score]
@@ -173,7 +175,9 @@ async def query_documents(request: QueryRequest):
         chunks = [chunks_map[fid] for fid in faiss_ids if fid in chunks_map]
 
         # ── Step 3: Generate answer ──────────────────────────────────────────────
+        llm_start = time.perf_counter()
         llm_result = await generate_answer(request.query, chunks)
+        metrics["llm_ms"] = int((time.perf_counter() - llm_start) * 1000)
 
         # ── Step 4: Build response ───────────────────────────────────────────────
         citations = [
@@ -191,13 +195,16 @@ async def query_documents(request: QueryRequest):
             mode=request.search_mode
         )
 
-        # ── Step 5: Log query for analytics (Week 2) ─────────────────────────────
+        # ── Step 5: Log query for analytics (Week 2/4) ───────────────────────────
         insert_query_log(
             query=request.query,
             answer=llm_result["answer"],
             confidence=confidence,
             latency_ms=total_latency_ms,
             tokens_used=llm_result["tokens_used"],
+            embed_ms=metrics["embed_ms"],
+            retrieval_ms=metrics["retrieval_ms"],
+            llm_ms=metrics["llm_ms"]
         )
 
         return QueryResponse(
