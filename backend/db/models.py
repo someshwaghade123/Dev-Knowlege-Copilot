@@ -192,3 +192,54 @@ def get_all_chunks() -> list[dict]:
     rows = [dict(row) for row in cursor.fetchall()]
     conn.close()
     return rows
+
+
+def get_latency_metrics() -> dict:
+    """
+    Calculate aggregate performance stats from query_logs.
+    Includes Average, P50 (Median), and P95 latency.
+    """
+    conn = get_connection()
+    cursor = conn.cursor()
+    
+    # ── 1. Basic Counts & Averages ───────────────────────────────────────────
+    cursor.execute("""
+        SELECT 
+            COUNT(*) as total_queries,
+            SUM(tokens_used) as total_tokens,
+            AVG(latency_ms) as avg_total,
+            AVG(embed_ms) as avg_embed,
+            AVG(retrieval_ms) as avg_retrieval,
+            AVG(llm_ms) as avg_llm
+        FROM query_logs
+    """)
+    summary = dict(cursor.fetchone())
+    
+    # ── 2. Percentile Calculation (P50, P95) ──────────────────────────────────
+    # SQLite doesn't have NTILE/PERCENTILE by default, so we sort in Python
+    def get_percentile(column: str, p: float) -> int:
+        cursor.execute(f"SELECT {column} FROM query_logs WHERE {column} IS NOT NULL ORDER BY {column} ASC")
+        values = [r[0] for r in cursor.fetchall()]
+        if not values:
+            return 0
+        idx = int(p * len(values))
+        return values[min(idx, len(values) - 1)]
+
+    metrics = {
+        "summary": summary,
+        "p50": {
+            "total": get_percentile("latency_ms", 0.50),
+            "embed": get_percentile("embed_ms", 0.50),
+            "retrieval": get_percentile("retrieval_ms", 0.50),
+            "llm": get_percentile("llm_ms", 0.50),
+        },
+        "p95": {
+            "total": get_percentile("latency_ms", 0.95),
+            "embed": get_percentile("embed_ms", 0.95),
+            "retrieval": get_percentile("retrieval_ms", 0.95),
+            "llm": get_percentile("llm_ms", 0.95),
+        }
+    }
+    
+    conn.close()
+    return metrics
