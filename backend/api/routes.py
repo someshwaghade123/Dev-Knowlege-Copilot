@@ -201,7 +201,14 @@ async def query_documents(request: QueryRequest):
         metrics["llm_ms"] = int((time.perf_counter() - llm_start) * 1000)
 
         # ── Step 4: Build response ───────────────────────────────────────────────
-        citations = [
+        from backend.generation.llm import extract_citation_indices
+        used_indices = extract_citation_indices(llm_result["answer"])
+
+        # If LLM didn't use any citations, or used invalid ones, we fallback?
+        # Actually, if used_indices is empty, it means no [n] was found.
+        # We only return citations that the LLM actually cited.
+        
+        all_citations = [
             Citation(
                 title=c["title"],
                 source_url=c.get("source_url"),
@@ -209,6 +216,9 @@ async def query_documents(request: QueryRequest):
             )
             for c in chunks
         ]
+        
+        # Filter: indices are 1-based from [1], [2]...
+        citations = [all_citations[i-1] for i in used_indices if 0 < i <= len(all_citations)]
 
         total_latency_ms = int((time.perf_counter() - wall_start) * 1000)
         confidence = compute_confidence(
@@ -216,24 +226,28 @@ async def query_documents(request: QueryRequest):
             mode=request.search_mode
         )
 
+
         # ── Step 5: Log query for analytics (Week 2/4) ───────────────────────────
-        insert_query_log(
-            query=request.query,
-            answer=llm_result["answer"],
-            confidence=confidence,
-            latency_ms=total_latency_ms,
-            tokens_used=llm_result["tokens_used"],
-            embed_ms=metrics["embed_ms"],
-            retrieval_ms=metrics["retrieval_ms"],
-            llm_ms=metrics["llm_ms"]
-        )
+        try:
+            insert_query_log(
+                query=request.query,
+                answer=llm_result.get("answer") or "N/A",
+                confidence=confidence,
+                latency_ms=total_latency_ms,
+                tokens_used=llm_result.get("tokens_used", 0),
+                embed_ms=metrics.get("embed_ms", 0),
+                retrieval_ms=metrics.get("retrieval_ms", 0),
+                llm_ms=metrics.get("llm_ms", 0),
+            )
+        except Exception as log_err:
+            print(f"[Analytics] Non-critical: failed to log query: {log_err}")
 
         return QueryResponse(
-            answer=llm_result["answer"],
+            answer=llm_result.get("answer") or "I could not generate an answer.",
             citations=citations,
             confidence=confidence,
             latency_ms=total_latency_ms,
-            tokens_used=llm_result["tokens_used"],
+            tokens_used=llm_result.get("tokens_used", 0),
         )
 
     except HTTPException:

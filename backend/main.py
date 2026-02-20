@@ -42,9 +42,13 @@ async def lifespan(app: FastAPI):
     print("[Startup] Application ready.")
     yield   # App serves requests between yield and shutdown
 
-    print("[Shutdown] Saving FAISS index to disk...")
-    vector_store.save()
+    # NOTE: We do NOT auto-save the FAISS index here.
+    # The index is managed exclusively by ingest scripts (scripts/ingest_all.py)
+    # which save after a successful ingestion. Auto-saving on shutdown was
+    # causing a regression: the stale in-memory index (loaded at startup) would
+    # overwrite a freshly built index on disk.
     print("[Shutdown] Done.")
+
 
 
 app = FastAPI(
