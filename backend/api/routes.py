@@ -57,6 +57,7 @@ class QueryRequest(BaseModel):
     search_mode: str = "hybrid"         # "hybrid" | "vector" | "bm25"
     min_confidence: str | None = None   # "high" | "medium" | "low"
     top_n_rerank: int = 5               # How many to keep after reranking
+    bypass_llm: bool = False            # For benchmarking: skip LLM and only return retrieval results
 
 
 
@@ -213,27 +214,39 @@ async def query_documents(request: QueryRequest):
 
         chunks = reranked  # Use the re-ranked chunks for generation
 
-        # ── Step 3: Generate answer ──────────────────────────────────────────────
-        llm_start = time.perf_counter()
-        llm_result = await generate_answer(request.query, chunks)
-        metrics["llm_ms"] = int((time.perf_counter() - llm_start) * 1000)
+        # ── Step 3: Generate answer (Optional) ──────────────────────────────────
+        if request.bypass_llm:
+            llm_result = {
+                "answer": "[Bypass Mode] Retrieval only. No answer generated.",
+                "tokens_used": 0
+            }
+            metrics["llm_ms"] = 0
+            metrics["fact_ms"] = 0
+            fact_check = {"is_grounded": True, "reasoning": "Bypass mode"}
+        else:
+            llm_start = time.perf_counter()
+            llm_result = await generate_answer(request.query, chunks)
+            metrics["llm_ms"] = int((time.perf_counter() - llm_start) * 1000)
 
-        # ── Step 3.5: Factuality Check (Week 5) ──────────────────────────────────
-        # Perform a second-pass check to detect hallucinations
-        fact_start = time.perf_counter()
-        fact_check = await verify_factuality(request.query, llm_result["answer"], chunks)
-        metrics["fact_ms"] = int((time.perf_counter() - fact_start) * 1000)
-        
-        # If the check fails, we downgrade confidence
-        if not fact_check["is_grounded"]:
-            confidence = "low"
-            # Optional: Append a subtle warning or log it
-            print(f"[Factuality Guard] Hallucination detected for query: {request.query}")
-            print(f"Reasoning: {fact_check['reasoning']}")
+            # ── Step 3.5: Factuality Check (Week 5) ──────────────────────────────
+            # Perform a second-pass check to detect hallucinations
+            fact_start = time.perf_counter()
+            fact_check = await verify_factuality(request.query, llm_result["answer"], chunks)
+            metrics["fact_ms"] = int((time.perf_counter() - fact_start) * 1000)
+            
+            # If the check fails, we downgrade confidence
+            if not fact_check["is_grounded"]:
+                confidence = "low"
+                print(f"[Factuality Guard] Hallucination detected for query: {request.query}")
+                print(f"Reasoning: {fact_check['reasoning']}")
 
         # ── Step 4: Build response ───────────────────────────────────────────────
-        from backend.generation.llm import extract_citation_indices
-        used_indices = extract_citation_indices(llm_result["answer"])
+        if request.bypass_llm:
+            # In bypass mode, we return all top chunks as citations
+            used_indices = list(range(1, len(chunks) + 1))
+        else:
+            from backend.generation.llm import extract_citation_indices
+            used_indices = extract_citation_indices(llm_result["answer"])
 
         # If LLM didn't use any citations, or used invalid ones, we fallback?
         # Actually, if used_indices is empty, it means no [n] was found.

@@ -1,0 +1,86 @@
+[
+    {
+        "query": "How do I build a Docker image?",
+        "expected_docs": [
+            "docker_reference.md"
+        ],
+        "category": "Docker"
+    },
+    {
+        "query": "Explain the difference between Docker images and containers",
+        "expected_docs": [
+            "docker_reference.md"
+        ],
+        "category": "Docker"
+    },
+    {
+        "query": "How to run a docker container in the background?",
+        "expected_docs": [
+            "docker_reference.md"
+        ],
+        "category": "Docker"
+    },
+    {
+        "query": "FastAPI vs NodeJS performance",
+        "expected_docs": [
+            "fastapi_getting_started.md"
+        ],
+        "category": "FastAPI"
+    },
+    {
+        "query": "Create a basic GET route in FastAPI",
+        "expected_docs": [
+            "fastapi_getting_started.md"
+        ],
+        "category": "FastAPI"
+    },
+    {
+        "query": "How to handle request body with Pydantic?",
+        "expected_docs": [
+            "fastapi_getting_started.md"
+        ],
+        "category": "FastAPI"
+    },
+    {
+        "query": "Configure CORS in FastAPI",
+        "expected_docs": [
+            "fastapi_getting_started.md"
+        ],
+        "category": "FastAPI"
+    },
+    {
+        "query": "What is a vector database?",
+        "expected_docs": [
+            "vector_databases_guide.md"
+        ],
+        "category": "General"
+    },
+    {
+        "query": "Difference between FAISS and ChromaDB",
+        "expected_docs": [
+            "vector_databases_guide.md"
+        ],
+        "category": "General"
+    },
+    {
+        "query": "How does HNSW algorithm work?",
+        "expected_docs": [
+            "vector_databases_guide.md"
+        ],
+        "category": "General"
+    },
+    {
+        "query": "Which FAISS index should I use for 1 million vectors?",
+        "expected_docs": [
+            "vector_databases_guide.md"
+        ],
+        "category": "General"
+    },
+    {
+        "query": "How to test FastAPI with pytest?",
+        "expected_docs": [
+            "fastapi_getting_started.md"
+        ],
+        "category": "FastAPI"
+    }
+]
