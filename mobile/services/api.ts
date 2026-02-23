@@ -25,7 +25,7 @@
 //    - Your phone and PC MUST be on the same Wi-Fi.
 //    - You MUST start the backend with `uvicorn ... --host 0.0.0.0`
 //
-const BASE_URL = "http://10.53.167.156:8000/api/v1";
+const BASE_URL = "http://10.53.167.156:8001/api/v1";
 
 /**
  * Enhanced fetch with a timeout to prevent infinite "loading" states.

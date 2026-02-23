@@ -32,6 +32,7 @@ from fastapi import APIRouter, HTTPException, Request
 from pydantic import BaseModel
 from backend.retrieval.vector_store import vector_store
 from backend.retrieval.hybrid import hybrid_search
+from backend.ingestion.embedder import embed_query
 from backend.generation.llm import generate_answer, verify_factuality
 from backend.db.models import (
     get_chunks_by_faiss_ids, 
@@ -177,18 +178,28 @@ async def query_documents(body: QueryRequest, request: Request):
         if not body.query.strip():
             raise HTTPException(status_code=400, detail="Query cannot be empty")
 
-        # ── Step 0: Cache Lookup (Week 6) ────────────────────────────────────────
-        cached_response = cache_manager.get(body.query, body.top_k)
-        if cached_response:
-            return QueryResponse(**cached_response)
+        # ── Step 0: Embed Query Early for Semantic Cache ─────────────────────────
+        # We need the vector to check for semantic similarity in the cache
+        embed_start = time.perf_counter()
+        query_vector = await loop.run_in_executor(None, embed_query, body.query)
+        metrics["embed_ms"] = int((time.perf_counter() - embed_start) * 1000)
 
-        # ── Step 1: Hybrid search (Week 3/4) ─────────────────────────────────────
+        # ── Step 1: Cache Lookup (Week 6/Refined) ─────────────────────────────────
+        cached_data = cache_manager.get(query_vector)
+        if cached_data:
+            # FIX: Dynamically update latency for cache hits
+            cached_data["latency_ms"] = int((time.perf_counter() - wall_start) * 1000)
+            return QueryResponse(**cached_data)
+
+        # ── Step 2: Hybrid search (Week 3/4) ─────────────────────────────────────
+        # Note: We pass the pre-computed query_vector to avoid re-embedding
         search_data = await loop.run_in_executor(
             None, 
             hybrid_search, 
             body.query, 
             body.top_k, 
-            body.search_mode
+            body.search_mode,
+            query_vector # New parameter
         )
         search_results = search_data["results"]
         metrics = search_data["metrics"]
@@ -330,8 +341,10 @@ async def query_documents(body: QueryRequest, request: Request):
             tokens_used=llm_result.get("tokens_used", 0),
         )
 
-        # ── Step 6: Store in Cache (Week 6) ─────────────────────────────────────
-        cache_manager.set(body.query, body.top_k, response.model_dump())
+        # ── Step 6: Store in Cache (Week 6/Refined) ──────────────────────────────
+        # We store the embedding alongside the response for semantic matching
+        if not body.bypass_llm:
+            cache_manager.set(body.query, query_vector, response.model_dump())
 
         return response
 

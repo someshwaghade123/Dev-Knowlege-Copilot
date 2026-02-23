@@ -1,41 +1,62 @@
-import hashlib
-import json
 import time
+import threading
+import numpy as np
+import faiss
 from typing import Optional, Any
 
 class CacheManager:
     """
-    Manages response caching for queries to reduce LLM costs and latency.
-    Supports in-memory caching by default, expandable to Redis for production.
+    Manages semantic response caching using vector similarity.
+    Uses a lightweight FAISS index to find "near-matches" to previous queries.
     """
-    def __init__(self, ttl_seconds: int = 3600):
+    def __init__(self, dimension: int = 384, ttl_seconds: int = 3600, threshold: float = 0.95):
+        self.dimension = dimension
         self.ttl = ttl_seconds
-        self._cache = {} # Key: md5_hash, Value: (expiry_timestamp, data)
+        self.threshold = threshold
+        
+        self._lock = threading.Lock()
+        self._index = faiss.IndexFlatIP(dimension)
+        self._cache_data = []  # List of (expiry, data, original_query) matching index order
 
-    def _generate_key(self, query: str, top_k: int = 5) -> str:
-        """Generate a unique key based on the query and retrieval parameters."""
-        payload = f"{query.strip().lower()}:{top_k}"
-        return hashlib.md5(payload.encode()).hexdigest()
+    def get(self, query_vector: np.ndarray) -> Optional[dict]:
+        """
+        Find a semantically similar cached response.
+        Returns the data if similarity > threshold and hasn't expired.
+        """
+        if self._index.ntotal == 0:
+            return None
 
-    def get(self, query: str, top_k: int = 5) -> Optional[dict]:
-        """Retrieve a cached response if it exists and hasn't expired."""
-        key = self._generate_key(query, top_k)
-        if key in self._cache:
-            expiry, data = self._cache[key]
-            if time.time() < expiry:
-                print(f"[Cache] Hit for: {query}")
-                return data
-            else:
-                print(f"[Cache] Expired for: {query}")
-                del self._cache[key]
+        # Ensure correct shape (1, dim)
+        v = query_vector.reshape(1, -1).astype("float32")
+        
+        with self._lock:
+            # Search the cache index for the single closest match
+            scores, indices = self._index.search(v, 1)
+            
+            idx = indices[0][0]
+            score = scores[0][0]
+
+            if idx != -1 and score >= self.threshold:
+                expiry, data, original_query = self._cache_data[idx]
+                if time.time() < expiry:
+                    print(f"[Cache] Semantic Hit! Score: {score:.4f}")
+                    print(f"  Match: '{original_query}'")
+                    return data
+                else:
+                    # In a real system, we'd remove expired entries from FAISS.
+                    # For this MVP, we just treat it as a miss.
+                    print(f"[Cache] Semantic match found but expired.")
         return None
 
-    def set(self, query: str, top_k: int = 5, data: dict = {}) -> None:
-        """Store a response in the cache with a TTL."""
-        key = self._generate_key(query, top_k)
+    def set(self, query: str, query_vector: np.ndarray, data: dict) -> None:
+        """Store a response and its embedding in the semantic cache."""
+        v = query_vector.reshape(1, -1).astype("float32")
         expiry = time.time() + self.ttl
-        self._cache[key] = (expiry, data)
-        print(f"[Cache] Stored response for: {query}")
+        
+        with self._lock:
+            self._index.add(v)
+            self._cache_data.append((expiry, data, query))
+            print(f"[Cache] Stored semantic entry for: {query}")
 
 # Global instance for app-wide use
 cache_manager = CacheManager()

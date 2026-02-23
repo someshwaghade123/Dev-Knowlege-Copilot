@@ -90,4 +90,5 @@ app.include_router(router, prefix="/api/v1")
 if __name__ == "__main__":
     import uvicorn
     # reload=False to avoid "paging file too small" errors on Windows/RAM-limited envs
-    uvicorn.run("backend.main:app", host="0.0.0.0", port=8000, reload=False)
+    # Changed to 8001 to avoid common system-level port conflicts (WinError 10013)
+    uvicorn.run("backend.main:app", host="0.0.0.0", port=8001, reload=False)

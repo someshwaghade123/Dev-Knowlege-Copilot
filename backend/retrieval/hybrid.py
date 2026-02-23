@@ -13,20 +13,20 @@ ALGORITHM: Reciprocal Rank Fusion (RRF)
 
 import time
 import re
+import numpy as np
 from backend.retrieval.vector_store import vector_store
 from backend.ingestion.embedder import embed_query
 from backend.retrieval.bm25_store import bm25_store
 from backend.db.models import get_chunk_titles
 
-def hybrid_search(query: str, top_k: int = 5, search_mode: str = "hybrid") -> dict:
+def hybrid_search(query: str, top_k: int = 5, search_mode: str = "hybrid", query_vector: np.ndarray = None) -> dict:
     """
     Combined search interface with granular latency tracking and Title Boosting.
     """
     metrics = {"embed_ms": 0, "retrieval_ms": 0}
     
     # ── Step 1: Embedding ────────────────────────────────────────────────────
-    query_vector = None
-    if search_mode in ["vector", "hybrid"]:
+    if search_mode in ["vector", "hybrid"] and query_vector is None:
         t0 = time.perf_counter()
         query_vector = embed_query(query)
         metrics["embed_ms"] = int((time.perf_counter() - t0) * 1000)
