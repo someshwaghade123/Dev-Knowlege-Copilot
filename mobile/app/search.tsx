@@ -16,6 +16,7 @@ import {
     Alert,
     Linking,
 } from "react-native";
+import Markdown from "react-native-markdown-display";
 import { queryDocuments, QueryResponse, Citation } from "../services/api";
 
 // ── Confidence badge colors ────────────────────────────────────────────────────
@@ -156,7 +157,12 @@ export default function SearchScreen() {
                                 <Text style={styles.sectionLabel}>AI ANSWER</Text>
                                 <Text style={styles.sparkleIcon}>✨</Text>
                             </View>
-                            <Text style={styles.answerText}>{result.answer}</Text>
+
+                            <View style={{ flex: 1 }}>
+                                <Markdown style={markdownStyles}>
+                                    {result.answer}
+                                </Markdown>
+                            </View>
                         </View>
 
                         {/* Sources Section */}
@@ -276,3 +282,60 @@ const styles = StyleSheet.create({
     citationTitle: { fontSize: 14, color: "#f1f5f9", fontWeight: "600", marginBottom: 6 },
     citationPreview: { fontSize: 13, color: "#94a3b8", lineHeight: 20 },
 });
+
+// ── Markdown Styles ───────────────────────────────────────────────────────────
+
+const markdownStyles: any = {
+    body: {
+        color: "#f1f5f9",
+        fontSize: 15,
+        lineHeight: 24,
+    },
+    strong: {
+        fontWeight: "bold",
+        color: "#fff",
+    },
+    em: {
+        fontStyle: "italic",
+    },
+    link: {
+        color: "#6366f1",
+    },
+    bullet_list: {
+        marginVertical: 10,
+    },
+    list_item: {
+        marginVertical: 4,
+    },
+    paragraph: {
+        marginTop: 0,
+        marginBottom: 10,
+    },
+    code_inline: {
+        backgroundColor: "#2d3748",
+        color: "#fbbf24", // Amber color for inline code
+        fontFamily: "monospace",
+        paddingHorizontal: 4,
+        borderRadius: 4,
+    },
+    code_block: {
+        backgroundColor: "#1e293b",
+        borderColor: "#334155",
+        borderWidth: 1,
+        borderRadius: 8,
+        padding: 12,
+        marginVertical: 10,
+        fontFamily: "monospace",
+        color: "#94a3b8",
+    },
+    fence: {
+        backgroundColor: "#1e293b",
+        borderColor: "#475569",
+        borderWidth: 1,
+        borderRadius: 8,
+        padding: 12,
+        marginVertical: 10,
+        fontFamily: "monospace",
+        color: "#f1f5f9",
+    },
+};

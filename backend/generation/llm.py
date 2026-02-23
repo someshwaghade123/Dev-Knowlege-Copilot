@@ -172,11 +172,10 @@ async def verify_factuality(query: str, answer: str, chunks: list[dict]) -> dict
     system_message = (
         "You are a strict fact-checker. Your job is to verify if a given answer is "
         "fully supported by the provided context. "
-        "IMPORTANT: If the answer correctly states that the information is NOT in the context, "
-        "or says 'I don't know' because the context is insufficient, mark it as grounded (is_grounded: true). "
-        "Only flag an answer as ungrounded if it makes specific claims or cites facts NOT present in the context. "
-        "Output your response in JSON format only: {'score': int, 'is_grounded': bool, 'reason': str}. "
-        "Score is from 0 to 10."
+        "IMPORTANT: If the answer correctly states that the information is NOT in the context, mark it as grounded. "
+        "TECHNICAL ADVICE: If the answer provides correct technical code or logic found in the context, do NOT flag it as ungrounded just because a source tag [n] is missing or mismatched. "
+        "ONLY flag as ungrounded (is_grounded: false) if it makes a specific factual claim that CONTRADICTS the context or introduces outside information as if it was in the docs. "
+        "Output JSON only: {'score': int, 'is_grounded': bool, 'reason': str}."
     )
     
     user_message = (
