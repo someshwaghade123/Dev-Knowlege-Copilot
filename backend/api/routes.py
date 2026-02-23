@@ -42,6 +42,7 @@ from backend.db.models import (
 from backend.core.config import settings
 from backend.retrieval.reranker import reranker
 from backend.scoring.engine import compute_confidence
+from backend.cache.cache_manager import cache_manager
 
 router = APIRouter()
 
@@ -132,6 +133,7 @@ async def query_documents(request: QueryRequest):
     Main RAG endpoint with robust error logging.
     """
     wall_start = time.perf_counter()
+    metrics = {}
 
     try:
         if not request.query.strip():
@@ -142,6 +144,12 @@ async def query_documents(request: QueryRequest):
                 status_code=503,
                 detail="No documents indexed yet. Run ingest_docs.py first."
             )
+
+        # ── Step 0: Check Cache (Week 6) ────────────────────────────────────────
+        cached_response = cache_manager.get(request.query, request.top_k)
+        if cached_response:
+            # We wrap the dict back into a QueryResponse
+            return QueryResponse(**cached_response)
 
         # ── Step 1: Hybrid search (Week 3/4) ─────────────────────────────────────
         search_data = hybrid_search(
@@ -263,13 +271,18 @@ async def query_documents(request: QueryRequest):
         except Exception as log_err:
             print(f"[Analytics] Non-critical: failed to log query: {log_err}")
 
-        return QueryResponse(
+        response = QueryResponse(
             answer=llm_result.get("answer") or "I could not generate an answer.",
             citations=citations,
             confidence=confidence,
             latency_ms=total_latency_ms,
             tokens_used=llm_result.get("tokens_used", 0),
         )
+
+        # ── Step 6: Store in Cache (Week 6) ─────────────────────────────────────
+        cache_manager.set(request.query, request.top_k, response.model_dump())
+
+        return response
 
     except HTTPException:
         raise
