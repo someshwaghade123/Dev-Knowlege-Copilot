@@ -44,6 +44,12 @@ class Settings(BaseSettings):
     # ── App ──────────────────────────────────────────────────────────────────
     app_env: str = "development"
     log_level: str = "INFO"
+    server_port: int = 8001     # Moved to 8001 due to frequent WinError 10013
+    rate_limit: str = "20/minute"
+
+    # ── Caching ──────────────────────────────────────────────────────────────
+    cache_ttl_seconds: int = 3600
+    cache_similarity_threshold: float = 0.95
 
     # Tells pydantic-settings to read from .env file automatically
     model_config = SettingsConfigDict(env_file=".env", case_sensitive=False)

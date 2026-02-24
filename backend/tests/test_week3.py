@@ -35,8 +35,9 @@ def test_hybrid_search_logic():
     vector_store.load_or_create()
     
     query = "hybrid search"
-    results = hybrid_search(query, top_k=5, search_mode="hybrid")
-    
+    search_data = hybrid_search(query, top_k=5, search_mode="hybrid")
+    results = search_data["results"]
+
     assert len(results) > 0
     # Every result should have a score and a faiss_id
     for res in results:
