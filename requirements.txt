@@ -3,6 +3,7 @@ fastapi==0.110.0
 uvicorn[standard]==0.29.0
 python-dotenv==1.0.1
 pydantic-settings==2.2.1
+python-multipart==0.0.22
 
 # ── Embeddings ─────────────────────────────────────────────────────────────────
 sentence-transformers==2.6.1   # Loads BGE-small-en-v1.5 model

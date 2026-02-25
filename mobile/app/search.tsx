@@ -16,8 +16,9 @@ import {
     Alert,
     Linking,
 } from "react-native";
+import * as DocumentPicker from "expo-document-picker";
 import Markdown from "react-native-markdown-display";
-import { queryDocuments, QueryResponse, Citation } from "../services/api";
+import { queryDocuments, uploadDocument, QueryResponse, Citation } from "../services/api";
 
 // ── Confidence badge colors ────────────────────────────────────────────────────
 const CONFIDENCE_COLORS: Record<string, string> = {
@@ -93,8 +94,42 @@ const CitationCard: React.FC<{ citation: Citation; index: number }> = ({
 export default function SearchScreen() {
     const [query, setQuery] = useState("");
     const [loading, setLoading] = useState(false);
+    const [uploading, setUploading] = useState(false);
     const [result, setResult] = useState<QueryResponse | null>(null);
     const [error, setError] = useState<{ message: string, type: "network" | "rate_limit" | "other" } | null>(null);
+
+    const handleUpload = async () => {
+        try {
+            const result = await DocumentPicker.getDocumentAsync({
+                type: ['text/plain', 'text/markdown', '*/*'],
+                copyToCacheDirectory: true,
+            });
+
+            if (result.canceled) return;
+
+            const file = result.assets[0];
+
+            if (!file.name.endsWith('.md') && !file.name.endsWith('.txt')) {
+                Alert.alert("Unsupported File", "Please upload a .txt or .md file.");
+                return;
+            }
+
+            setUploading(true);
+            setError(null);
+
+            const uploadRes = await uploadDocument(file.uri, file.name, file.mimeType || 'text/plain');
+
+            Alert.alert(
+                "Upload Complete",
+                `Indexed ${uploadRes.chunks_processed} chunks from ${uploadRes.file_name}`
+            );
+
+        } catch (err: any) {
+            setError({ message: err.message || "Failed to upload document", type: "other" });
+        } finally {
+            setUploading(false);
+        }
+    };
 
     const handleSearch = async () => {
         const trimmed = query.trim();
@@ -132,9 +167,24 @@ export default function SearchScreen() {
         <SafeAreaView style={styles.safeArea}>
             <ScrollView contentContainerStyle={styles.container} keyboardShouldPersistTaps="handled">
 
-                {/* Header */}
-                <Text style={styles.header}>🧠 Dev Knowledge Copilot</Text>
-                <Text style={styles.subtitle}>Ask anything about your technical docs</Text>
+                {/* Header with Upload Button */}
+                <View style={styles.headerRow}>
+                    <View>
+                        <Text style={styles.header}>🧠 Dev Knowledge Copilot</Text>
+                        <Text style={styles.subtitle}>Ask anything about your technical docs</Text>
+                    </View>
+                    <TouchableOpacity
+                        style={styles.uploadButton}
+                        onPress={handleUpload}
+                        disabled={loading || uploading}
+                    >
+                        {uploading ? (
+                            <ActivityIndicator color="#6366f1" size="small" />
+                        ) : (
+                            <Text style={styles.uploadIcon}>📁</Text>
+                        )}
+                    </TouchableOpacity>
+                </View>
 
                 {/* Search input */}
                 <View style={styles.inputRow}>
@@ -236,8 +286,27 @@ const styles = StyleSheet.create({
     safeArea: { flex: 1, backgroundColor: "#0f172a" },
     container: { padding: 20, paddingBottom: 40, flexGrow: 1 },
 
-    header: { fontSize: 26, fontWeight: "bold", color: "#f8fafc", textAlign: "center", marginTop: 12 },
-    subtitle: { fontSize: 14, color: "#94a3b8", textAlign: "center", marginBottom: 24 },
+    headerRow: {
+        flexDirection: "row",
+        justifyContent: "space-between",
+        alignItems: "flex-start",
+        marginTop: 12,
+        marginBottom: 24
+    },
+    header: { fontSize: 26, fontWeight: "bold", color: "#f8fafc" },
+    subtitle: { fontSize: 13, color: "#94a3b8", marginTop: 4 },
+
+    uploadButton: {
+        backgroundColor: "rgba(99, 102, 241, 0.15)",
+        borderWidth: 1,
+        borderColor: "rgba(99, 102, 241, 0.3)",
+        borderRadius: 12,
+        width: 44,
+        height: 44,
+        justifyContent: "center",
+        alignItems: "center",
+    },
+    uploadIcon: { fontSize: 20 },
 
     inputRow: {
         backgroundColor: "#1e293b",

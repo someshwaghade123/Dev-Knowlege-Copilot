@@ -25,7 +25,7 @@
 //    - Your phone and PC MUST be on the same Wi-Fi.
 //    - You MUST start the backend with `uvicorn ... --host 0.0.0.0`
 //
-const BASE_URL = "http://10.53.167.156:8001/api/v1";
+const BASE_URL = "http://10.53.163.80:8001/api/v1";
 
 /**
  * Enhanced fetch with a timeout to prevent infinite "loading" states.
@@ -109,5 +109,37 @@ export async function checkHealth(): Promise<HealthResponse> {
 export async function listDocuments(): Promise<{ count: number; documents: any[] }> {
     const response = await fetchWithTimeout(`${BASE_URL}/documents`);
     if (!response.ok) throw new Error("Failed to fetch documents");
+    return response.json();
+}
+
+/**
+ * POST /api/v1/documents/upload
+ * Uploads a text/markdown file for instant ingestion.
+ */
+export async function uploadDocument(
+    fileUri: string,
+    fileName: string,
+    mimeType: string
+): Promise<{ message: string; file_name: string; chunks_processed: number }> {
+    const formData = new FormData();
+    // @ts-ignore - React Native FormData accepts an object with uri, name, and type
+    formData.append("file", {
+        uri: fileUri,
+        name: fileName,
+        type: mimeType,
+    });
+
+    const response = await fetchWithTimeout(`${BASE_URL}/documents/upload`, {
+        method: "POST",
+        body: formData,
+        // Do NOT set Content-Type header. fetch will automatically set it to 
+        // multipart/form-data with the correct boundary when a FormData object is passed.
+    });
+
+    if (!response.ok) {
+        const error = await response.json().catch(() => ({}));
+        throw new Error(error.detail ?? `Upload failed: ${response.status}`);
+    }
+
     return response.json();
 }
