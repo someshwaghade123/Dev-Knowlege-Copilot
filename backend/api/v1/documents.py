@@ -3,7 +3,8 @@ import time
 from fastapi import APIRouter, File, UploadFile, HTTPException
 from backend.db.models import get_all_documents, insert_document, insert_chunk, get_all_chunks
 from backend.api.v1.schemas import DocumentsListResponse
-from backend.ingestion.chunker import chunk_document
+from backend.ingestion.chunker import chunk_document, chunk_code
+from backend.ingestion.parsers import extract_text, RICH_FORMATS, CODE_FORMATS, ALL_SUPPORTED
 from backend.ingestion.embedder import embed_texts
 from backend.retrieval.vector_store import vector_store
 from backend.retrieval.bm25_store import bm25_store
@@ -22,25 +23,45 @@ async def list_documents():
 @router.post("/documents/upload")
 async def upload_document(file: UploadFile = File(...)):
     """
-    Dynamically upload, chunk, embed, and index a new text/markdown file.
+    Dynamically upload, chunk, embed, and index a document.
+    Supports rich formats (PDF, DOCX, PPTX) and plain text/code files.
     """
-    if not file.filename.endswith((".md", ".txt")):
-        raise HTTPException(status_code=400, detail="Only .md and .txt files are supported for now.")
-    
+    file_ext = "." + file.filename.rsplit(".", 1)[-1].lower() if "." in file.filename else ""
+
+    if file_ext not in ALL_SUPPORTED:
+        raise HTTPException(
+            status_code=400,
+            detail=f"Unsupported file type '{file_ext}'. Supported: {', '.join(sorted(ALL_SUPPORTED))}"
+        )
+
+    content_bytes = await file.read()
+
     try:
-        content_bytes = await file.read()
-        content = content_bytes.decode("utf-8")
-    except Exception as e:
-        raise HTTPException(status_code=400, detail=f"Failed to decode file. Ensure it is valid UTF-8 text. Error: {e}")
+        # 1a. Text extraction — rich formats use parsers, others decode as UTF-8
+        if file_ext in RICH_FORMATS:
+            loop = asyncio.get_running_loop()
+            content = await loop.run_in_executor(None, extract_text, content_bytes, file_ext)
+        else:
+            try:
+                content = content_bytes.decode("utf-8")
+            except Exception as e:
+                raise HTTPException(status_code=400, detail=f"Failed to decode file: {e}")
+    except ValueError as ve:
+        raise HTTPException(status_code=400, detail=str(ve))
+    except RuntimeError as re:
+        raise HTTPException(status_code=500, detail=str(re))
 
     loop = asyncio.get_running_loop()
 
     try:
-        # 1. Chunking
-        chunks = chunk_document(content, file.filename)
+        # 1b. Chunking — code files get structural chunking
+        if file_ext in CODE_FORMATS:
+            chunks = chunk_code(content, file.filename, doc_title=file.filename)
+        else:
+            chunks = chunk_document(content, doc_title=file.filename)
         if not chunks:
             raise HTTPException(status_code=400, detail="Could not extract any text chunks from the file.")
-            
+
         chunk_texts = [c.text for c in chunks]
 
         # 2. Embedding
