@@ -212,6 +212,30 @@ def insert_query_log(query: str, answer: str, confidence: str,
     conn.close()
 
 
+def delete_document(doc_id: int) -> list[int]:
+    """
+    Remove a document and all its chunks from the database.
+    Returns the list of faiss_ids that were associated with this document,
+    so they can be removed from the FAISS index.
+    """
+    conn = get_connection()
+    cursor = conn.cursor()
+    
+    # 1. Get all associated FAISS IDs
+    cursor.execute("SELECT faiss_id FROM chunks WHERE doc_id = ?", (doc_id,))
+    faiss_ids = [row["faiss_id"] for row in cursor.fetchall()]
+    
+    # 2. Delete chunks
+    cursor.execute("DELETE FROM chunks WHERE doc_id = ?", (doc_id,))
+    
+    # 3. Delete document
+    cursor.execute("DELETE FROM documents WHERE id = ?", (doc_id,))
+    
+    conn.commit()
+    conn.close()
+    return faiss_ids
+
+
 def get_all_chunks() -> list[dict]:
     """Retrieve all chunks with their faiss_id and text — used to build BM25."""
     conn = get_connection()
