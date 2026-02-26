@@ -24,6 +24,7 @@ import {
     Platform,
     ActivityIndicator,
     Alert,
+    FlatList,
 } from "react-native";
 import * as DocumentPicker from "expo-document-picker";
 import { uploadDocument, listDocuments, uploadText, deleteDocument } from "../services/api";
@@ -58,6 +59,13 @@ const SUPPORTED_EXTS = [
     ".swift", ".r", ".lua", ".sh",
 ];
 
+const EXT_GROUPS = [
+    { title: "📄 Documents", exts: [".pdf", ".docx", ".pptx", ".md", ".txt", ".rst"] },
+    { title: "🐍 Backend", exts: [".py", ".java", ".go", ".rs", ".c", ".cpp", ".rb", ".php", ".sh"] },
+    { title: "🌐 Web & JS", exts: [".js", ".ts", ".tsx", ".jsx", ".json", ".html", ".css"] },
+    { title: "📱 Mobile", exts: [".swift", ".kt", ".scala"] },
+];
+
 function getFileIcon(name: string): string {
     const ext = "." + name.split(".").pop()?.toLowerCase();
     if (ext === ".pdf") return "📄";
@@ -90,6 +98,7 @@ export default function UploadSheet({ visible, onClose }: UploadSheetProps) {
     const [docs, setDocs] = useState<IndexedDoc[]>([]);
     const [loadingDocs, setLoadingDocs] = useState(false);
     const [deletingIds, setDeletingIds] = useState<number[]>([]);
+    const [showAllFormats, setShowAllFormats] = useState(false);
 
     const slideAnim = useRef(new Animated.Value(SCREEN_HEIGHT)).current;
 
@@ -211,17 +220,20 @@ export default function UploadSheet({ visible, onClose }: UploadSheetProps) {
     return (
         <Modal transparent visible={visible} animationType="none" onRequestClose={handleClose}>
             {/* Dim backdrop */}
-            <TouchableOpacity style={styles.backdrop} activeOpacity={1} onPress={handleClose} />
+            <TouchableOpacity
+                style={styles.backdrop}
+                activeOpacity={1}
+                onPress={handleClose}
+            />
 
-            <Animated.View style={[styles.sheet, { transform: [{ translateY: slideAnim }] }]}>
-                <KeyboardAvoidingView behavior={Platform.OS === "ios" ? "padding" : undefined}>
-
+            <View style={styles.sheetContainer} pointerEvents="box-none">
+                <Animated.View style={[styles.sheet, { transform: [{ translateY: slideAnim }] }]}>
                     {/* Handle bar */}
                     <View style={styles.handle} />
 
                     {/* Header */}
                     <View style={styles.sheetHeader}>
-                        <Text style={styles.sheetTitle}>📚 Add to Knowledge Base</Text>
+                        <Text style={styles.sheetTitle}>📚 Knowledge Base</Text>
                         <TouchableOpacity onPress={handleClose} style={styles.closeBtn}>
                             <Text style={styles.closeBtnText}>✕</Text>
                         </TouchableOpacity>
@@ -245,108 +257,158 @@ export default function UploadSheet({ visible, onClose }: UploadSheetProps) {
                     {/* ── Tab: File Upload ── */}
                     {activeTab === "upload" && (
                         <View style={styles.tabContent}>
-                            <TouchableOpacity
-                                style={[
-                                    styles.uploadCard,
-                                    uploadState === "uploading" && styles.uploadCardLoading,
-                                    uploadState === "success" && styles.uploadCardSuccess,
-                                    uploadState === "error" && styles.uploadCardError,
-                                ]}
-                                onPress={uploadState === "idle" || uploadState === "error" ? handlePickFile : undefined}
-                                activeOpacity={0.8}
-                                disabled={uploadState === "uploading"}
+                            <ScrollView
+                                style={{ flex: 1 }}
+                                contentContainerStyle={{ flexGrow: 1, paddingBottom: 40 }}
+                                showsVerticalScrollIndicator={false}
+                                nestedScrollEnabled={true}
+                                overScrollMode="always"
                             >
-                                {uploadState === "idle" && (
-                                    <>
-                                        <Text style={styles.uploadCardIcon}>📄</Text>
-                                        <Text style={styles.uploadCardTitle}>Choose a File</Text>
-                                        <Text style={styles.uploadCardSub}>
-                                            PDF, Word, PowerPoint, Code & more
-                                        </Text>
-                                        <View style={styles.pillRow}>
-                                            {[".pdf", ".docx", ".pptx", ".py", ".java", ".ts"].map((ext) => (
-                                                <View key={ext} style={styles.extPill}>
-                                                    <Text style={styles.extPillText}>{ext}</Text>
+                                <View
+                                    style={[
+                                        styles.uploadCard,
+                                        uploadState === "uploading" && styles.uploadCardLoading,
+                                        uploadState === "success" && styles.uploadCardSuccess,
+                                        uploadState === "error" && styles.uploadCardError,
+                                    ]}
+                                >
+                                    {uploadState === "idle" && (
+                                        <>
+                                            <TouchableOpacity
+                                                style={styles.uploadArea}
+                                                onPress={handlePickFile}
+                                                activeOpacity={0.7}
+                                            >
+                                                <Text style={styles.uploadCardIcon}>📄</Text>
+                                                <Text style={styles.uploadCardTitle}>Choose a File</Text>
+                                                <Text style={styles.uploadCardSub}>
+                                                    PDF, Word, Code & more
+                                                </Text>
+                                                <View style={styles.pillRow}>
+                                                    <View style={styles.extPillHero}>
+                                                        <Text style={styles.extPillTextHero}>📄 PDF, DOCX</Text>
+                                                    </View>
+                                                    <View style={styles.extPillHero}>
+                                                        <Text style={styles.extPillTextHero}>🐍 Python, JS</Text>
+                                                    </View>
                                                 </View>
-                                            ))}
-                                            <View style={styles.extPill}>
-                                                <Text style={styles.extPillText}>+24 more</Text>
-                                            </View>
-                                        </View>
-                                    </>
-                                )}
-                                {uploadState === "uploading" && (
-                                    <>
-                                        <ActivityIndicator size="large" color="#6366f1" />
-                                        <Text style={styles.uploadCardTitle}>Indexing...</Text>
-                                        <Text style={styles.uploadCardSub}>
-                                            Chunking, embedding, and storing your document
-                                        </Text>
-                                    </>
-                                )}
-                                {uploadState === "success" && (
-                                    <>
-                                        <Text style={styles.uploadCardIcon}>✅</Text>
-                                        <Text style={[styles.uploadCardTitle, { color: "#22c55e" }]}>
-                                            Indexed Successfully!
-                                        </Text>
-                                        <Text style={styles.uploadCardSub}>
-                                            {uploadedFile?.name}
-                                        </Text>
-                                        <View style={styles.chunkBadge}>
-                                            <Text style={styles.chunkBadgeText}>
-                                                {uploadedFile?.chunks} chunks added to the brain
+                                            </TouchableOpacity>
+
+                                            <View style={styles.formatsDivider} />
+
+                                            <TouchableOpacity
+                                                onPress={() => setShowAllFormats(!showAllFormats)}
+                                                style={styles.showAllFormatsBtn}
+                                                activeOpacity={0.6}
+                                            >
+                                                <Text style={styles.showAllFormatsText}>
+                                                    {showAllFormats ? "🔼 Hide Supported Formats" : "🔽 View All 30+ Formats"}
+                                                </Text>
+                                            </TouchableOpacity>
+
+                                            {showAllFormats && (
+                                                <View style={styles.formatsGrid}>
+                                                    {EXT_GROUPS.map((group) => (
+                                                        <View key={group.title} style={styles.formatGroup}>
+                                                            <Text style={styles.formatGroupTitle}>{group.title}</Text>
+                                                            <View style={styles.groupPills}>
+                                                                {group.exts.map(ext => (
+                                                                    <View key={ext} style={styles.extPillSmall}>
+                                                                        <Text style={styles.extPillTextSmall}>{ext}</Text>
+                                                                    </View>
+                                                                ))}
+                                                            </View>
+                                                        </View>
+                                                    ))}
+                                                </View>
+                                            )}
+                                        </>
+                                    )}
+                                    {uploadState === "uploading" && (
+                                        <View style={styles.uploadArea}>
+                                            <ActivityIndicator size="large" color="#6366f1" />
+                                            <Text style={styles.uploadCardTitle}>Indexing...</Text>
+                                            <Text style={styles.uploadCardSub}>
+                                                Chunking, embedding, and storing
                                             </Text>
                                         </View>
-                                        <TouchableOpacity onPress={() => setUploadState("idle")} style={styles.uploadAgainBtn}>
-                                            <Text style={styles.uploadAgainText}>Upload Another</Text>
-                                        </TouchableOpacity>
-                                    </>
-                                )}
-                                {uploadState === "error" && (
-                                    <>
-                                        <Text style={styles.uploadCardIcon}>❌</Text>
-                                        <Text style={[styles.uploadCardTitle, { color: "#ef4444" }]}>Upload Failed</Text>
-                                        <Text style={styles.uploadCardSub}>{errorMessage}</Text>
-                                        <TouchableOpacity onPress={() => setUploadState("idle")} style={styles.uploadAgainBtn}>
-                                            <Text style={styles.uploadAgainText}>Try Again</Text>
-                                        </TouchableOpacity>
-                                    </>
-                                )}
-                            </TouchableOpacity>
+                                    )}
+                                    {uploadState === "success" && (
+                                        <View style={styles.uploadArea}>
+                                            <Text style={styles.uploadCardIcon}>✅</Text>
+                                            <Text style={[styles.uploadCardTitle, { color: "#22c55e" }]}>
+                                                Indexed!
+                                            </Text>
+                                            <Text style={styles.uploadCardSub}>
+                                                {uploadedFile?.name}
+                                            </Text>
+                                            <View style={styles.chunkBadge}>
+                                                <Text style={styles.chunkBadgeText}>
+                                                    {uploadedFile?.chunks} chunks added
+                                                </Text>
+                                            </View>
+                                            <TouchableOpacity onPress={() => setUploadState("idle")} style={styles.uploadAgainBtn}>
+                                                <Text style={styles.uploadAgainText}>Upload Another</Text>
+                                            </TouchableOpacity>
+                                        </View>
+                                    )}
+                                    {uploadState === "error" && (
+                                        <View style={styles.uploadArea}>
+                                            <Text style={styles.uploadCardIcon}>❌</Text>
+                                            <Text style={[styles.uploadCardTitle, { color: "#ef4444" }]}>Failed</Text>
+                                            <Text style={styles.uploadCardSub}>{errorMessage}</Text>
+                                            <TouchableOpacity onPress={() => setUploadState("idle")} style={styles.uploadAgainBtn}>
+                                                <Text style={styles.uploadAgainText}>Try Again</Text>
+                                            </TouchableOpacity>
+                                        </View>
+                                    )}
+                                </View>
+                            </ScrollView>
                         </View>
                     )}
 
                     {/* ── Tab: Paste Text ── */}
                     {activeTab === "paste" && (
-                        <View style={styles.tabContent}>
-                            <TextInput
-                                style={styles.pasteTitle}
-                                placeholder="Document name (optional)"
-                                placeholderTextColor="#64748b"
-                                value={pasteTitle}
-                                onChangeText={setPasteTitle}
-                            />
-                            <TextInput
-                                style={styles.pasteInput}
-                                placeholder="Paste your text, code, or notes here..."
-                                placeholderTextColor="#64748b"
-                                value={pasteText}
-                                onChangeText={setPasteText}
-                                multiline
-                                scrollEnabled
-                            />
-                            <TouchableOpacity
-                                style={[styles.pasteBtn, pasteState === "uploading" && { opacity: 0.6 }]}
-                                onPress={handlePasteUpload}
-                                disabled={pasteState === "uploading"}
-                            >
-                                {pasteState === "uploading"
-                                    ? <ActivityIndicator color="#fff" />
-                                    : <Text style={styles.pasteBtnText}>⚡ Index Now</Text>
-                                }
-                            </TouchableOpacity>
-                        </View>
+                        <KeyboardAvoidingView
+                            behavior={Platform.OS === "ios" ? "padding" : "height"}
+                            style={{ flex: 1 }}
+                            keyboardVerticalOffset={Platform.OS === "ios" ? 100 : 0}
+                        >
+                            <View style={styles.tabContent}>
+                                <ScrollView
+                                    style={{ flex: 1 }}
+                                    contentContainerStyle={{ flexGrow: 1, paddingBottom: 40 }}
+                                    showsVerticalScrollIndicator={false}
+                                >
+                                    <TextInput
+                                        style={styles.pasteTitle}
+                                        placeholder="Document name (optional)"
+                                        placeholderTextColor="#64748b"
+                                        value={pasteTitle}
+                                        onChangeText={setPasteTitle}
+                                    />
+                                    <TextInput
+                                        style={styles.pasteInput}
+                                        placeholder="Paste your text, code, or notes here..."
+                                        placeholderTextColor="#64748b"
+                                        value={pasteText}
+                                        onChangeText={setPasteText}
+                                        multiline
+                                        scrollEnabled={false}
+                                    />
+                                    <TouchableOpacity
+                                        style={[styles.pasteBtn, pasteState === "uploading" && { opacity: 0.6 }]}
+                                        onPress={handlePasteUpload}
+                                        disabled={pasteState === "uploading"}
+                                    >
+                                        {pasteState === "uploading"
+                                            ? <ActivityIndicator color="#fff" />
+                                            : <Text style={styles.pasteBtnText}>⚡ Index Now</Text>
+                                        }
+                                    </TouchableOpacity>
+                                </ScrollView>
+                            </View>
+                        </KeyboardAvoidingView>
                     )}
 
                     {/* ── Tab: Browse Docs ── */}
@@ -357,40 +419,49 @@ export default function UploadSheet({ visible, onClose }: UploadSheetProps) {
                             ) : docs.length === 0 ? (
                                 <View style={styles.emptyState}>
                                     <Text style={styles.emptyIcon}>📂</Text>
-                                    <Text style={styles.emptyText}>No documents indexed yet</Text>
-                                    <Text style={styles.emptySub}>Upload your first file to get started</Text>
+                                    <Text style={styles.emptyText}>Empty Brain</Text>
+                                    <Text style={styles.emptySub}>No documents indexed yet</Text>
                                 </View>
                             ) : (
-                                <ScrollView showsVerticalScrollIndicator={false}>
-                                    <Text style={styles.docCount}>{docs.length} document{docs.length !== 1 ? "s" : ""} indexed</Text>
-                                    {docs.map((doc) => (
-                                        <View key={doc.id} style={styles.docRow}>
-                                            <Text style={styles.docIcon}>{getFileIcon(doc.file_name)}</Text>
+                                <FlatList
+                                    data={docs}
+                                    keyExtractor={(item) => item.id.toString()}
+                                    showsVerticalScrollIndicator={false}
+                                    style={{ flex: 1 }}
+                                    contentContainerStyle={{ paddingBottom: 40 }}
+                                    ListHeaderComponent={() => (
+                                        <Text style={styles.docCount}>
+                                            {docs.length} document{docs.length !== 1 ? "s" : ""} indexed
+                                        </Text>
+                                    )}
+                                    renderItem={({ item }) => (
+                                        <View style={styles.docRow}>
+                                            <Text style={styles.docIcon}>{getFileIcon(item.file_name)}</Text>
                                             <View style={styles.docInfo}>
-                                                <Text style={styles.docName} numberOfLines={1}>{doc.file_name}</Text>
+                                                <Text style={styles.docName} numberOfLines={1}>{item.file_name}</Text>
                                                 <Text style={styles.docMeta}>
-                                                    {doc.chunk_count} chunks • {new Date(doc.ingested_at).toLocaleDateString()}
+                                                    {item.chunk_count} chunks • {new Date(item.ingested_at).toLocaleDateString()}
                                                 </Text>
                                             </View>
                                             <TouchableOpacity
                                                 style={styles.deleteBtn}
-                                                onPress={() => handleDelete(doc)}
-                                                disabled={deletingIds.includes(doc.id)}
+                                                onPress={() => handleDelete(item)}
+                                                disabled={deletingIds.includes(item.id)}
                                             >
-                                                {deletingIds.includes(doc.id) ? (
+                                                {deletingIds.includes(item.id) ? (
                                                     <ActivityIndicator size="small" color="#ef4444" />
                                                 ) : (
                                                     <Text style={styles.deleteIcon}>🗑️</Text>
                                                 )}
                                             </TouchableOpacity>
                                         </View>
-                                    ))}
-                                </ScrollView>
+                                    )}
+                                />
                             )}
                         </View>
                     )}
-                </KeyboardAvoidingView>
-            </Animated.View>
+                </Animated.View>
+            </View>
         </Modal>
     );
 }
@@ -402,19 +473,18 @@ const styles = StyleSheet.create({
         ...StyleSheet.absoluteFillObject,
         backgroundColor: "rgba(0,0,0,0.6)",
     },
+    sheetContainer: {
+        flex: 1,
+        justifyContent: "flex-end",
+    },
     sheet: {
-        position: "absolute",
-        bottom: 0,
-        left: 0,
-        right: 0,
         backgroundColor: "#0f172a",
         borderTopLeftRadius: 24,
         borderTopRightRadius: 24,
         borderTopWidth: 1,
         borderColor: "rgba(99,102,241,0.2)",
-        paddingBottom: 40,
-        minHeight: SCREEN_HEIGHT * 0.65,
-        maxHeight: SCREEN_HEIGHT * 0.92,
+        paddingBottom: 20, // Reduced from 40 for flex layout
+        height: SCREEN_HEIGHT * 0.85, // Direct height instead of absolute min/max
     },
     handle: {
         width: 40, height: 4,
@@ -496,6 +566,18 @@ const styles = StyleSheet.create({
         borderColor: "rgba(239,68,68,0.4)",
         backgroundColor: "rgba(239,68,68,0.06)",
         borderStyle: "solid",
+    },
+    uploadArea: {
+        width: "100%",
+        alignItems: "center",
+        justifyContent: "center",
+        paddingVertical: 10,
+    },
+    formatsDivider: {
+        width: "80%",
+        height: 1,
+        backgroundColor: "rgba(255,255,255,0.05)",
+        marginVertical: 4,
     },
     uploadCardIcon: { fontSize: 48, marginBottom: 12 },
     uploadCardTitle: {
@@ -620,4 +702,56 @@ const styles = StyleSheet.create({
     deleteIcon: {
         fontSize: 16,
     },
+
+    // Formats UX
+    extPillHero: {
+        backgroundColor: "rgba(99,102,241,0.15)",
+        borderRadius: 12,
+        paddingHorizontal: 12,
+        paddingVertical: 6,
+        margin: 4,
+    },
+    extPillTextHero: { color: "#818cf8", fontSize: 13, fontWeight: "600" },
+    showAllFormatsBtn: {
+        marginTop: 12,
+        paddingVertical: 4,
+    },
+    showAllFormatsText: {
+        color: "#6366f1",
+        fontSize: 13,
+        fontWeight: "600",
+        textDecorationLine: "underline",
+    },
+    formatsGrid: {
+        width: "100%",
+        marginTop: 20,
+        backgroundColor: "rgba(255,255,255,0.03)",
+        borderRadius: 16,
+        padding: 16,
+        borderWidth: 1,
+        borderColor: "rgba(255,255,255,0.05)",
+    },
+    formatGroup: {
+        marginBottom: 16,
+    },
+    formatGroupTitle: {
+        color: "#cbd5e1",
+        fontSize: 12,
+        fontWeight: "700",
+        textTransform: "uppercase",
+        letterSpacing: 0.5,
+        marginBottom: 8,
+    },
+    groupPills: {
+        flexDirection: "row",
+        flexWrap: "wrap",
+        gap: 6,
+    },
+    extPillSmall: {
+        backgroundColor: "rgba(255,255,255,0.05)",
+        borderRadius: 6,
+        paddingHorizontal: 8,
+        paddingVertical: 3,
+    },
+    extPillTextSmall: { color: "#94a3b8", fontSize: 11 },
 });
