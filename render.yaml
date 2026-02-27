@@ -1,0 +1,38 @@
+services:
+  - type: web
+    name: dev-knowledge-copilot-api
+    env: docker
+    region: oregon # You can change this to Ohio or Frankfurt if closer
+    plan: free # Note: Free instances spin down after inactivity. Upgrade to Starter ($7/mo) for persistent uptime + disk.
+    
+    # Enable Docker build
+    dockerfilePath: Dockerfile
+    
+    # Health Check
+    healthCheckPath: /api/v1/health
+    
+    # Environment Variables
+    envVars:
+      - key: PORT
+        value: 10000 # Render defaults to port 10000 
+      - key: APP_ENV
+        value: production
+      - key: ENABLE_METRICS
+        value: true
+      - key: HOST
+        value: 0.0.0.0
+      - key: STORAGE_DIR
+        value: /data # Mount point for persistent disk
+      
+      # NOTE: For PRODUCTION, you MUST set ANTHROPIC_API_KEY manually in the Render Dashboard -> Environment tab.
+      # DO NOT commit your actual API key to this file.
+      - key: ANTHROPIC_API_KEY
+        sync: false 
+        
+    # Persistent Storage for SQLite Database & FAISS Vector Index
+    # IMPORTANT: Persistent disks are ONLY available on paid paid plans (Starter and up).
+    # If using the free tier, uploading new documents will be wiped if the server restarts.
+    disk:
+      name: copilot-data
+      mountPath: /data
+      sizeGB: 1
