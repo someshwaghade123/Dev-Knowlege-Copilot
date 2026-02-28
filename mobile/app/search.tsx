@@ -14,6 +14,7 @@ import {
     StyleSheet,
     SafeAreaView,
     Alert,
+    Linking,
 } from "react-native";
 import { queryDocuments, QueryResponse, Citation } from "../services/api";
 
@@ -29,23 +30,31 @@ const CONFIDENCE_COLORS: Record<string, string> = {
 const CitationCard: React.FC<{ citation: Citation; index: number }> = ({
     citation,
     index,
-}: {
-    citation: Citation;
-    index: number;
 }) => {
+    const handleOpenLink = () => {
+        if (citation.source_url) {
+            Linking.openURL(citation.source_url).catch(() =>
+                Alert.alert("Error", "Could not open link.")
+            );
+        }
+    };
+
     return (
-        <View style={styles.citationCard}>
-            <Text style={styles.citationNumber}>📄 Source {index + 1}</Text>
-            <Text style={styles.citationTitle}>{citation.title}</Text>
-            {citation.source_url && (
-                <Text style={styles.citationUrl} numberOfLines={1}>
-                    {citation.source_url}
-                </Text>
-            )}
-            <Text style={styles.citationPreview} numberOfLines={3}>
+        <TouchableOpacity
+            style={styles.citationCard}
+            onPress={handleOpenLink}
+            disabled={!citation.source_url}
+            activeOpacity={0.7}
+        >
+            <View style={styles.citationHeader}>
+                <Text style={styles.citationNumber}>SOURCE {index + 1}</Text>
+                {citation.source_url && <Text style={styles.linkIcon}>🔗</Text>}
+            </View>
+            <Text style={styles.citationTitle} numberOfLines={1}>{citation.title}</Text>
+            <Text style={styles.citationPreview} numberOfLines={4}>
                 {citation.text_preview}
             </Text>
-        </View>
+        </TouchableOpacity>
     );
 };
 
@@ -216,8 +225,14 @@ const styles = StyleSheet.create({
         borderLeftColor: "#6366f1",
         marginBottom: 10,
     },
-    citationNumber: { fontSize: 12, color: "#6366f1", fontWeight: "600", marginBottom: 4 },
-    citationTitle: { fontSize: 14, color: "#f1f5f9", fontWeight: "600", marginBottom: 2 },
-    citationUrl: { fontSize: 12, color: "#64748b", marginBottom: 6 },
+    citationHeader: {
+        flexDirection: "row",
+        justifyContent: "space-between",
+        alignItems: "center",
+        marginBottom: 6,
+    },
+    citationNumber: { fontSize: 11, color: "#6366f1", fontWeight: "700", letterSpacing: 0.5 },
+    linkIcon: { fontSize: 14 },
+    citationTitle: { fontSize: 15, color: "#f1f5f9", fontWeight: "600", marginBottom: 6 },
     citationPreview: { fontSize: 13, color: "#94a3b8", lineHeight: 20 },
 });

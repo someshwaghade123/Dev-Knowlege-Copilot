@@ -65,13 +65,14 @@ def build_prompt(query: str, chunks: list[dict]) -> list[dict]:
         "Answer the user's question using ONLY the provided context blocks. "
         "If the answer is not in the context, say: "
         "'I could not find a reliable answer in the indexed documents.' "
-        "Always cite which Context number(s) you used at the end of your answer."
+        "Use citation numbers like [1] or [2] whenever you reference a source. "
+        "Always list the [n] numbers you used at the very end of your answer."
     )
 
     user_message = (
         f"CONTEXT:\n{context_str}\n\n"
         f"QUESTION: {query}\n\n"
-        "Provide a clear, accurate answer with citation numbers."
+        "Provide a clear, accurate answer. Use [1], [2] etc. for inline citations."
     )
 
     return [
