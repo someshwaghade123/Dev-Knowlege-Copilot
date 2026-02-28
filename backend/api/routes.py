@@ -156,11 +156,21 @@ async def query_documents(request: QueryRequest):
         ]
 
         total_latency_ms = int((time.perf_counter() - wall_start) * 1000)
+        confidence = compute_confidence([r["score"] for r in filtered])
+
+        # ── Step 5: Log query for analytics (Week 2) ─────────────────────────────
+        insert_query_log(
+            query=request.query,
+            answer=llm_result["answer"],
+            confidence=confidence,
+            latency_ms=total_latency_ms,
+            tokens_used=llm_result["tokens_used"],
+        )
 
         return QueryResponse(
             answer=llm_result["answer"],
             citations=citations,
-            confidence=compute_confidence([r["score"] for r in filtered]),
+            confidence=confidence,
             latency_ms=total_latency_ms,
             tokens_used=llm_result["tokens_used"],
         )
