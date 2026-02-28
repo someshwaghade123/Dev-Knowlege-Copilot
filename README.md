@@ -122,22 +122,10 @@ docker run -p 8000:8000 --env-file .env dev-copilot:latest
 │   ├── app/search.tsx        ← Search screen UI
 │   └── services/api.ts       ← Backend API calls
 ├── scripts/ingest_docs.py    ← CLI ingestion pipeline
-├── data/sample_docs/         ← Sample .md documents
-└── docs/week1/               ← Interview prep documentation
+└── data/sample_docs/         ← Sample .md documents
 ```
 
 ---
-
-## Documentation
-
-All technical concepts are documented with interview Q&A in `docs/week1/`:
-
-- [`01_chunking.md`](docs/week1/01_chunking.md) — Why we chunk, overlap strategy
-- [`02_embeddings.md`](docs/week1/02_embeddings.md) — BGE model, cosine similarity
-- [`03_faiss.md`](docs/week1/03_faiss.md) — Index types, FAISS internals
-- [`04_rag_pipeline.md`](docs/week1/04_rag_pipeline.md) — End-to-end RAG flow
-- [`05_fastapi_structure.md`](docs/week1/05_fastapi_structure.md) — API design decisions
-- [`06_interview_qa.md`](docs/week1/06_interview_qa.md) — 15 interview Q&A
 
 ---
 

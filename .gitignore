@@ -10,6 +10,9 @@ data/faiss_index.bin
 data/metadata.db
 data/ids.npy
 
+# Documentation (Internal)
+docs/
+
 # Mobile (Expo / React Native)
 node_modules/
 .expo/
