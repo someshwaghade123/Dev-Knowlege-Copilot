@@ -1,0 +1,30 @@
+{
+    "expo": {
+        "name": "Dev Knowledge Copilot",
+        "slug": "dev-knowledge-copilot",
+        "version": "1.0.0",
+        "orientation": "portrait",
+        "scheme": "devcopilot",
+        "userInterfaceStyle": "dark",
+        "splash": {
+            "backgroundColor": "#0f172a"
+        },
+        "ios": {
+            "supportsTablet": false,
+            "bundleIdentifier": "com.devcopilot.app"
+        },
+        "android": {
+            "package": "com.devcopilot.app",
+            "adaptiveIcon": {
+                "backgroundColor": "#0f172a"
+            }
+        },
+        "platforms": [
+            "ios",
+            "android"
+        ],
+        "plugins": [
+            "expo-router"
+        ]
+    }
+}

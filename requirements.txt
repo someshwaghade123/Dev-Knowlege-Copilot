@@ -1,0 +1,27 @@
+# ── Core API ──────────────────────────────────────────────────────────────────
+fastapi==0.110.0
+uvicorn[standard]==0.29.0
+python-dotenv==1.0.1
+pydantic-settings==2.2.1
+
+# ── Embeddings ─────────────────────────────────────────────────────────────────
+sentence-transformers==2.6.1   # Loads BGE-small-en-v1.5 model
+torch==2.2.1                   # Required by sentence-transformers (CPU)
+numpy<2.0.0                    # Required for compatibility with FAISS/Sentence-Transformers
+
+# ── Vector Search ──────────────────────────────────────────────────────────────
+faiss-cpu==1.8.0               # Facebook AI Similarity Search (CPU version)
+
+# ── LLM Client ────────────────────────────────────────────────────────────────
+httpx==0.27.0                  # Async HTTP client for LLM API calls
+
+# ── Text Processing ────────────────────────────────────────────────────────────
+tiktoken==0.6.0                # OpenAI tokenizer — used to count tokens per chunk
+
+# ── Database ───────────────────────────────────────────────────────────────────
+# sqlite3 is built into Python — no extra install needed
+
+# ── Testing ────────────────────────────────────────────────────────────────────
+pytest==8.1.1
+pytest-asyncio==0.23.6
+httpx==0.27.0                  # Also used for TestClient in FastAPI tests
