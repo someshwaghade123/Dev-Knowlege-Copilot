@@ -101,7 +101,7 @@ async def generate_answer(query: str, chunks: list[dict]) -> dict:
     payload = {
         "model": settings.llm_model,
         "messages": messages,
-        "max_tokens": 512,
+        "max_tokens": 1024,
         "temperature": 0.2,   # Low temperature → more factual, less creative
     }
 

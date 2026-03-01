@@ -181,7 +181,7 @@ export default function SearchScreen() {
 
 const styles = StyleSheet.create({
     safeArea: { flex: 1, backgroundColor: "#0f172a" },
-    container: { padding: 20, paddingBottom: 40 },
+    container: { padding: 20, paddingBottom: 40, flexGrow: 1 },
 
     header: { fontSize: 26, fontWeight: "bold", color: "#f8fafc", textAlign: "center", marginTop: 12 },
     subtitle: { fontSize: 14, color: "#94a3b8", textAlign: "center", marginBottom: 24 },
