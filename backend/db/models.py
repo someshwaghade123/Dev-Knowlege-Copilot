@@ -73,10 +73,22 @@ def init_db() -> None:
             answer      TEXT NOT NULL,
             confidence  TEXT,
             latency_ms  INTEGER,
+            embed_ms    INTEGER,
+            retrieval_ms INTEGER,
+            llm_ms      INTEGER,
             tokens_used INTEGER,
             timestamp   TEXT DEFAULT (datetime('now'))
         )
     """)
+
+    # ── Migration for existing Week 2 databases ──
+    try:
+        cursor.execute("ALTER TABLE query_logs ADD COLUMN embed_ms INTEGER")
+        cursor.execute("ALTER TABLE query_logs ADD COLUMN retrieval_ms INTEGER")
+        cursor.execute("ALTER TABLE query_logs ADD COLUMN llm_ms INTEGER")
+    except sqlite3.OperationalError:
+        # Columns likely already exist
+        pass
 
     conn.commit()
     conn.close()
@@ -155,15 +167,18 @@ def get_all_documents() -> list[dict]:
 
 
 def insert_query_log(query: str, answer: str, confidence: str,
-                     latency_ms: int, tokens_used: int) -> None:
+                      latency_ms: int, tokens_used: int,
+                      embed_ms: int = 0, retrieval_ms: int = 0, llm_ms: int = 0) -> None:
     """Store a record of a RAG query and its performance metrics."""
     conn = get_connection()
     cursor = conn.cursor()
     cursor.execute(
         """INSERT INTO query_logs
-           (query, answer, confidence, latency_ms, tokens_used)
-           VALUES (?, ?, ?, ?, ?)""",
-        (query, answer, confidence, latency_ms, tokens_used),
+           (query, answer, confidence, latency_ms, tokens_used, 
+            embed_ms, retrieval_ms, llm_ms)
+           VALUES (?, ?, ?, ?, ?, ?, ?, ?)""",
+        (query, answer, confidence, latency_ms, tokens_used, 
+         embed_ms, retrieval_ms, llm_ms),
     )
     conn.commit()
     conn.close()
