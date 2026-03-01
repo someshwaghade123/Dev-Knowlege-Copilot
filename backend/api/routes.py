@@ -63,6 +63,23 @@ class QueryResponse(BaseModel):
     tokens_used: int
 
 
+class DocumentMetadata(BaseModel):
+    """Schema for a single document's metadata."""
+    id: int
+    title: str
+    source_url: str | None
+    file_name: str
+    ingested_at: str
+    chunk_count: int
+    total_tokens: int | None # SUM can be NULL if no chunks
+
+
+class DocumentsListResponse(BaseModel):
+    """Schema for GET /documents response."""
+    count: int
+    documents: list[DocumentMetadata]
+
+
 # ── Confidence scoring helper ─────────────────────────────────────────────────
 
 def compute_confidence(scores: list[float]) -> str:
@@ -187,11 +204,11 @@ async def query_documents(request: QueryRequest):
         raise HTTPException(status_code=500, detail=str(e))
 
 
-@router.get("/documents")
+@router.get("/documents", response_model=DocumentsListResponse)
 async def list_documents():
     """
-    Return all indexed documents.
-    Useful for the mobile app's "Browse" screen (future week).
+    Return all indexed documents with statistics.
+    Useful for the mobile app's "Browse" screen.
     """
     docs = get_all_documents()
-    return {"count": len(docs), "documents": docs}
+    return DocumentsListResponse(count=len(docs), documents=docs)

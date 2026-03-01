@@ -134,10 +134,21 @@ def get_chunks_by_faiss_ids(faiss_ids: list[int]) -> list[dict]:
 
 
 def get_all_documents() -> list[dict]:
-    """Return all indexed documents — used by the /documents endpoint."""
+    """
+    Return all indexed documents with statistics (chunk count, total tokens).
+    Uses a LEFT JOIN to ensure documents with 0 chunks (if any) are still shown.
+    """
     conn = get_connection()
     cursor = conn.cursor()
-    cursor.execute("SELECT * FROM documents ORDER BY ingested_at DESC")
+    cursor.execute("""
+        SELECT d.*, 
+               COUNT(c.id) as chunk_count,
+               SUM(c.token_count) as total_tokens
+        FROM documents d
+        LEFT JOIN chunks c ON d.id = c.doc_id
+        GROUP BY d.id
+        ORDER BY d.ingested_at DESC
+    """)
     rows = [dict(row) for row in cursor.fetchall()]
     conn.close()
     return rows
