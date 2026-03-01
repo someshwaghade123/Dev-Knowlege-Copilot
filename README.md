@@ -54,7 +54,7 @@ npm start
 |--------|----------|-------------|
 | `GET` | `/api/v1/health` | Liveness check + indexed vector count |
 | `POST` | `/api/v1/query` | Ask a question, get answer + citations |
-| `GET` | `/api/v1/documents` | List all indexed documents |
+| `GET` | `/api/v1/documents` | List all indexed docs + stats (chunk count, tokens) |
 
 ### POST /api/v1/query
 
@@ -86,7 +86,11 @@ npm start
 ## Run Tests
 
 ```bash
+# Week 1 tests
 pytest backend/tests/test_week1.py -v
+
+# Week 2 tests (Citations, Ingestion, Logging)
+pytest backend/tests/test_week2.py -v
 ```
 
 ---
@@ -107,22 +111,22 @@ docker run -p 8000:8000 --env-file .env dev-copilot:latest
 
 ```
 ├── backend/
-│   ├── api/routes.py         ← HTTP endpoints
+│   ├── api/routes.py         ← HTTP endpoints (Query, Health, Docs)
 │   ├── core/config.py        ← Settings (pydantic-settings)
-│   ├── db/models.py          ← SQLite schema
+│   ├── db/models.py          ← SQLite schema + Query Logs
 │   ├── ingestion/
-│   │   ├── chunker.py        ← Token-aware chunking with overlap
+│   │   ├── chunker.py        ← Structural Code Chunking (.py, .js)
 │   │   └── embedder.py       ← BGE-small-en-v1.5 embeddings
 │   ├── retrieval/
 │   │   └── vector_store.py   ← FAISS IndexFlatIP
 │   ├── generation/
-│   │   └── llm.py            ← Prompt builder + async LLM call
+│   │   └── llm.py            ← Prompt builder + citations logic
 │   └── main.py               ← App entry point
 ├── mobile/
-│   ├── app/search.tsx        ← Search screen UI
+│   ├── app/search.tsx        ← Premium Results UI
 │   └── services/api.ts       ← Backend API calls
-├── scripts/ingest_docs.py    ← CLI ingestion pipeline
-└── data/sample_docs/         ← Sample .md documents
+├── scripts/ingest_docs.py    ← Code-aware ingestion script
+└── data/sample_docs/         ← Sample documents
 ```
 
 ---
@@ -134,9 +138,10 @@ docker run -p 8000:8000 --env-file .env dev-copilot:latest
 | Week | Focus |
 |------|-------|
 | ✅ 1 | Basic RAG — chunking, embeddings, FAISS, citations |
-| 2 | Hybrid search (BM25 + vector) |
-| 3 | Latency metrics + request logging |
-| 4 | Confidence scoring + hallucination heuristics |
-| 5 | Redis caching + benchmarks |
-| 6 | Load testing (50 concurrent users) |
-| 7 | Deploy to Render + Expo APK build |
+| ✅ 2 | Advanced Citations + Mobile UI + Code Ingestion |
+| 🚧 3 | Hybrid search (BM25 + Vector) |
+| 📅 4 | Latency metrics + request logging |
+| 📅 5 | Confidence scoring + hallucination heuristics |
+| 📅 6 | Redis caching + benchmarks |
+| 📅 7 | Load testing (50 concurrent users) |
+| 📅 8 | Deploy to Render + Expo APK build |

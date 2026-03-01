@@ -167,3 +167,13 @@ def insert_query_log(query: str, answer: str, confidence: str,
     )
     conn.commit()
     conn.close()
+
+
+def get_all_chunks() -> list[dict]:
+    """Retrieve all chunks with their faiss_id and text — used to build BM25."""
+    conn = get_connection()
+    cursor = conn.cursor()
+    cursor.execute("SELECT faiss_id, text FROM chunks")
+    rows = [dict(row) for row in cursor.fetchall()]
+    conn.close()
+    return rows

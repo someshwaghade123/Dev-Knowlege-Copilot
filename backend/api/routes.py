@@ -31,6 +31,7 @@ from fastapi import APIRouter, HTTPException
 from pydantic import BaseModel
 
 from backend.retrieval.vector_store import vector_store
+from backend.retrieval.hybrid import hybrid_search
 from backend.generation.llm import generate_answer
 from backend.db.models import get_chunks_by_faiss_ids, get_all_documents, insert_query_log
 from backend.core.config import settings
@@ -45,6 +46,7 @@ class QueryRequest(BaseModel):
     query: str
     top_k: int = settings.top_k         # Caller can override retrieval count
     min_score: float = 0.0              # Filter out very low relevance results
+    search_mode: str = "hybrid"         # "hybrid" | "vector" | "bm25"
 
 
 class Citation(BaseModel):
@@ -82,25 +84,27 @@ class DocumentsListResponse(BaseModel):
 
 # ── Confidence scoring helper ─────────────────────────────────────────────────
 
-def compute_confidence(scores: list[float]) -> str:
+def compute_confidence(scores: list[float], mode: str) -> str:
     """
-    Simple rule-based confidence from FAISS similarity scores.
-
-    FAISS IndexFlatIP returns cosine similarity in [-1, 1] for normalised vectors.
-      > 0.80 → high    (very relevant chunks found)
-      > 0.60 → medium
-      ≤ 0.60 → low     (no strong match in index)
-
-    INTERVIEW TIP: In Week 5 we add an LLM self-check on top of this.
+    Rule-based confidence based on search mode and scores.
+    
+    - Vector mode: Cosine similarity [0, 1]
+    - Hybrid/BM25: RRF scores or BM25 raw scores (unbounded or small)
     """
     if not scores:
         return "low"
+        
     top_score = max(scores)
-    if top_score > 0.80:
-        return "high"
-    elif top_score > 0.60:
-        return "medium"
+    
+    if mode == "vector":
+        if top_score > 0.80: return "high"
+        if top_score > 0.60: return "medium"
+        return "low"
     else:
+        # For Hybrid (RRF) and BM25, we use relative thresholds 
+        # for Week 3. Week 5 will introduce a more robust approach.
+        if top_score > 0.03: return "high"
+        if top_score > 0.01: return "medium"
         return "low"
 
 
@@ -137,8 +141,12 @@ async def query_documents(request: QueryRequest):
                 detail="No documents indexed yet. Run ingest_docs.py first."
             )
 
-        # ── Step 1: Vector search ────────────────────────────────────────────────
-        search_results = vector_store.search(request.query, top_k=request.top_k)
+        # ── Step 1: Hybrid search (Week 3) ───────────────────────────────────────
+        search_results = hybrid_search(
+            request.query, 
+            top_k=request.top_k, 
+            search_mode=request.search_mode
+        )
 
         # Filter by minimum similarity score
         filtered = [r for r in search_results if r["score"] >= request.min_score]
@@ -178,7 +186,10 @@ async def query_documents(request: QueryRequest):
         ]
 
         total_latency_ms = int((time.perf_counter() - wall_start) * 1000)
-        confidence = compute_confidence([r["score"] for r in filtered])
+        confidence = compute_confidence(
+            [r["score"] for r in filtered], 
+            mode=request.search_mode
+        )
 
         # ── Step 5: Log query for analytics (Week 2) ─────────────────────────────
         insert_query_log(
