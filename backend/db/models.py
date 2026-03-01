@@ -145,6 +145,29 @@ def get_chunks_by_faiss_ids(faiss_ids: list[int]) -> list[dict]:
     return rows
 
 
+def get_chunk_titles(faiss_ids: list[int]) -> dict[int, str]:
+    """
+    Efficiently fetch only the document titles for a set of faiss_ids.
+    Used for the title-boosting heuristic during hybrid search.
+    """
+    if not faiss_ids:
+        return {}
+        
+    conn = get_connection()
+    cursor = conn.cursor()
+    placeholders = ",".join("?" * len(faiss_ids))
+    cursor.execute(
+        f"""SELECT c.faiss_id, d.title
+            FROM chunks c
+            JOIN documents d ON c.doc_id = d.id
+            WHERE c.faiss_id IN ({placeholders})""",
+        faiss_ids,
+    )
+    mapping = {row["faiss_id"]: row["title"] for row in cursor.fetchall()}
+    conn.close()
+    return mapping
+
+
 def get_all_documents() -> list[dict]:
     """
     Return all indexed documents with statistics (chunk count, total tokens).
