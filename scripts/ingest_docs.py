@@ -43,21 +43,32 @@ def load_documents_from_folder(folder: Path) -> list[dict]:
     Returns list of {"title", "text", "source_url", "file_name"} dicts.
     """
     docs = []
-    extensions = [".md", ".txt", ".rst"]
+    extensions = {".md", ".txt", ".rst", ".py", ".js", ".ts", ".tsx"}
 
     for file_path in sorted(folder.rglob("*")):
         if file_path.suffix.lower() in extensions and file_path.is_file():
-            text = file_path.read_text(encoding="utf-8", errors="ignore")
-            if len(text.strip()) < 100:
-                print(f"  [Skip] {file_path.name} — too short")
+            # Skip hidden files/folders (like .git, .expo)
+            if any(part.startswith(".") for part in file_path.parts):
                 continue
+
+            # Skip node_modules and venv
+            if "node_modules" in file_path.parts or "venv" in file_path.parts:
+                continue
+
+            text = file_path.read_text(encoding="utf-8", errors="ignore")
+            if len(text.strip()) < 50:  # Code files can be shorter than MD
+                continue
+
+            # Title: Include parent folder to differentiate (e.g., "api/routes.py")
+            title = f"{file_path.parent.name}/{file_path.name}"
+            
             docs.append({
-                "title": file_path.stem.replace("-", " ").replace("_", " ").title(),
+                "title": title,
                 "text": text,
-                "source_url": None,   # Local file — no URL
+                "source_url": None,
                 "file_name": file_path.name,
             })
-            print(f"  [Read] {file_path.name} ({len(text):,} chars)")
+            print(f"  [Read] {title} ({len(text):,} chars)")
 
     return docs
 
@@ -71,7 +82,7 @@ def ingest(source: str) -> None:
         sys.exit(1)
 
     # ── 1. Load files ────────────────────────────────────────────────────────
-    print(f"\n📂 Loading documents from: {source_path}")
+    print(f"\n[Ingest] Loading documents from: {source_path}")
     if source_path.is_dir():
         docs = load_documents_from_folder(source_path)
     else:
@@ -88,22 +99,22 @@ def ingest(source: str) -> None:
         print("[Error] No documents found.")
         sys.exit(1)
 
-    print(f"\n✅ Loaded {len(docs)} document(s)")
+    print(f"\n[Ingest] Loaded {len(docs)} document(s)")
 
     # ── 2. Init DB and FAISS ─────────────────────────────────────────────────
-    print("\n🗄️  Initialising database and vector store...")
+    print("\n[Ingest] Initialising database and vector store...")
     init_db()
     vector_store.load_or_create()
 
     # ── 3. Chunk all documents ───────────────────────────────────────────────
-    print("\n✂️  Chunking documents...")
+    print("\n[Ingest] Chunking documents...")
     doc_chunk_pairs = chunk_documents(docs)
 
     total_chunks = sum(len(chunks) for _, chunks in doc_chunk_pairs)
-    print(f"   → {total_chunks} total chunks across {len(docs)} docs")
+    print(f"   -> {total_chunks} total chunks across {len(docs)} docs")
 
     # ── 4. Embed and index ────────────────────────────────────────────────────
-    print(f"\n🔢 Embedding {total_chunks} chunks with {settings.embed_model}...")
+    print(f"\n[Ingest] Embedding {total_chunks} chunks with {settings.embed_model}...")
 
     for doc, chunks in doc_chunk_pairs:
         # Insert document record into SQLite
@@ -130,13 +141,13 @@ def ingest(source: str) -> None:
                 token_count=chunk.token_count,
             )
 
-        print(f"   ✅ '{doc['title']}' — {len(chunks)} chunks indexed")
+        print(f"   OK: '{doc['title']}' - {len(chunks)} chunks indexed")
 
     # ── 5. Save FAISS index to disk ──────────────────────────────────────────
-    print(f"\n💾 Saving vector index...")
+    print(f"\n[Ingest] Saving vector index...")
     vector_store.save()
 
-    print(f"\n🎉 Ingestion complete!")
+    print(f"\n[Ingest] Ingestion complete!")
     print(f"   Documents: {len(docs)}")
     print(f"   Chunks:    {total_chunks}")
     print(f"   Index:     {settings.faiss_index_path}")

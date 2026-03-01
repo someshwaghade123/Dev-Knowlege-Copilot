@@ -33,6 +33,7 @@ INTERVIEW TIP:
 import re
 import tiktoken
 from dataclasses import dataclass
+from pathlib import Path
 from backend.core.config import settings
 
 
@@ -110,19 +111,111 @@ def chunk_document(text: str, doc_title: str = "") -> list[Chunk]:
     return chunks
 
 
+def _get_code_blocks(text: str, language: str) -> list[str]:
+    """
+    Experimental: Identify logical blocks (classes, functions) in code.
+    This helps keep related logic together in a single chunk.
+    """
+    blocks = []
+    lines = text.split("\n")
+    current_block = []
+
+    # Simple regex-based markers for block starts
+    if language == "python":
+        # Python: starts with 'def ' or 'class ' at the beginning of a line
+        pattern = re.compile(r"^(def|class)\s+\w+")
+    else:
+        # JS/TS: 'function', 'class', 'const/let ... = (...) =>'
+        pattern = re.compile(r"^(export\s+)?(class|function|const|let)\s+\w+")
+
+    for line in lines:
+        if pattern.match(line) and current_block:
+            # New block started, save previous
+            blocks.append("\n".join(current_block))
+            current_block = [line]
+        else:
+            current_block.append(line)
+
+    if current_block:
+        blocks.append("\n".join(current_block))
+
+    return blocks
+
+
+def chunk_code(text: str, file_name: str, doc_title: str = "") -> list[Chunk]:
+    """
+    Intelligent code chunking that respects structural boundaries.
+    Falls back to token-based chunking if blocks are too large or small.
+    """
+    ext = Path(file_name).suffix.lower()
+    language = "python" if ext == ".py" else "javascript"
+
+    # 1. Identify raw structural blocks
+    raw_blocks = _get_code_blocks(text, language)
+
+    # 2. Refine blocks (merge small ones, split huge ones)
+    final_chunks: list[Chunk] = []
+    chunk_index = 0
+
+    current_text = ""
+    current_tokens = 0
+
+    for block in raw_blocks:
+        block_tokens = len(_tokenizer.encode(block))
+
+        # If block is huge (> max chunk size), split it using standard chunker
+        if block_tokens > settings.chunk_size:
+            # If we had pending text, save it first
+            if current_text:
+                final_chunks.append(Chunk(current_text, current_tokens, chunk_index, doc_title))
+                chunk_index += 1
+                current_text = ""
+                current_tokens = 0
+
+            # Split huge block
+            sub_chunks = chunk_document(block, doc_title)
+            for sc in sub_chunks:
+                sc.chunk_index = chunk_index
+                final_chunks.append(sc)
+                chunk_index += 1
+            continue
+
+        # If adding this block exceeds limit, save current and start new
+        if current_tokens + block_tokens > settings.chunk_size:
+            final_chunks.append(Chunk(current_text, current_tokens, chunk_index, doc_title))
+            chunk_index += 1
+            current_text = block
+            current_tokens = block_tokens
+        else:
+            # Merge block
+            current_text = (current_text + "\n\n" + block).strip() if current_text else block
+            current_tokens += block_tokens
+
+    # Final wrap up
+    if current_text:
+        final_chunks.append(Chunk(current_text, current_tokens, chunk_index, doc_title))
+
+    return final_chunks
+
+
 def chunk_documents(docs: list[dict]) -> list[tuple[dict, list[Chunk]]]:
     """
-    Chunk a list of documents.
-
-    Args:
-        docs: List of {"title": ..., "text": ..., "source_url": ..., "file_name": ...}
-
-    Returns:
-        List of (doc_dict, [Chunk, Chunk, ...]) tuples
+    Chunk a list of documents. Detects if a document is code and uses
+    specialised structural chunking if so.
     """
     result = []
+    code_extensions = {".py", ".js", ".ts", ".tsx"}
+
     for doc in docs:
-        chunks = chunk_document(doc["text"], doc_title=doc.get("title", ""))
+        file_name = doc.get("file_name", "")
+        ext = Path(file_name).suffix.lower()
+
+        if ext in code_extensions:
+            chunks = chunk_code(doc["text"], file_name, doc_title=doc.get("title", ""))
+            print(f"  [Chunker] (CODE) '{doc['title']}' -> {len(chunks)} chunks")
+        else:
+            chunks = chunk_document(doc["text"], doc_title=doc.get("title", ""))
+            print(f"  [Chunker] (TEXT) '{doc['title']}' -> {len(chunks)} chunks")
+
         result.append((doc, chunks))
-        print(f"  [Chunker] '{doc['title']}' → {len(chunks)} chunks")
     return result
