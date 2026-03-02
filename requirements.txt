@@ -28,6 +28,9 @@ tiktoken==0.6.0                # OpenAI tokenizer — used to count tokens per c
 # ── Database ───────────────────────────────────────────────────────────────────
 # sqlite3 is built into Python — no extra install needed
 
+# ── Security & Rate Limiting ─────────────────────────────────────────────────
+slowapi==0.1.9                 # Rate limiting for FastAPI
+
 # ── Testing ────────────────────────────────────────────────────────────────────
 pytest==8.1.1
 pytest-asyncio==0.23.6
