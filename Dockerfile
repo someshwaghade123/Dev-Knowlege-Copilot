@@ -7,7 +7,13 @@
 # ─────────────────────────────────────────────────────────────────────────────
 
 # ── Stage 1: Base setup ───────────────────────────────────────────────────────
+# ── Stage 1: Base setup ───────────────────────────────────────────────────────
 FROM python:3.11-slim as base
+
+# Install system dependencies (libgomp1 is required for ONNX runtime/fastembed)
+RUN apt-get update && apt-get install -y --no-install-recommends \
+  libgomp1 \
+  && rm -rf /var/lib/apt/lists/*
 
 # Prevents Python from writing .pyc files (keeps image smaller)
 ENV PYTHONDONTWRITEBYTECODE=1
@@ -17,16 +23,8 @@ ENV PYTHONUNBUFFERED=1
 WORKDIR /app
 
 # ── Stage 2: Dependency installation ─────────────────────────────────────────
-# Install dependencies BEFORE copying app code.
-# This way, the layer is cached as long as requirements.txt doesn't change.
-# (One of the most important Docker optimisation patterns)
 COPY requirements.txt .
 RUN pip install --no-cache-dir -r requirements.txt
-
-# Pre-download FastEmbed models to prevent boot-time timeouts (502 errors)
-RUN python -c "from fastembed import TextEmbedding, TextRerank; TextEmbedding(model_name='BAAI/bge-small-en-v1.5'); TextRerank(model_name='BAAI/bge-reranker-base')"
-
-
 
 # ── Stage 3: Copy application ─────────────────────────────────────────────────
 COPY backend/ ./backend/
@@ -36,12 +34,15 @@ COPY data/ ./data/
 # Create the data directory for FAISS index persistence
 RUN mkdir -p /app/data
 
+# Make startup script executable and fix line endings for Linux
+RUN sed -i 's/\r$//' /app/backend/start.sh && chmod +x /app/backend/start.sh
+
 # ── Runtime configuration ────────────────────────────────────────────────────
 EXPOSE 8001 10000
 
-# Health check — Docker will restart the container if this fails 3 times
-HEALTHCHECK --interval=30s --timeout=10s --start-period=20s --retries=3 \
+# Health check — increased start-period to 120s to allow for initial model download
+HEALTHCHECK --interval=30s --timeout=10s --start-period=120s --retries=3 \
   CMD python -c "import urllib.request, os; port = os.environ.get('PORT', '8001'); urllib.request.urlopen(f'http://localhost:{port}/api/v1/health')"
 
-# Start the FastAPI server
-CMD uvicorn backend.main:app --host 0.0.0.0 --port ${PORT:-8001}
+# Use the startup script to download models before starting uvicorn
+CMD ["/app/backend/start.sh"]
