@@ -11,9 +11,9 @@ python-docx==1.2.0             # Word (.docx) extraction
 python-pptx==1.0.2             # PowerPoint (.pptx) extraction
 
 # ── Embeddings ─────────────────────────────────────────────────────────────────
-sentence-transformers==2.6.1   # Loads BGE-small-en-v1.5 model
-torch==2.2.1                   # Required by sentence-transformers (CPU)
-numpy<2.0.0                    # Required for compatibility with FAISS/Sentence-Transformers
+fastembed==0.2.7               # Lightweight ONNX-based embeddings (No Torch!)
+onnxruntime==1.17.1            # Engine for fastembed (CPU)
+numpy<2.0.0                    # Required for compatibility with FAISS
 
 # ── Vector Search ──────────────────────────────────────────────────────────────
 faiss-cpu==1.8.0               # Facebook AI Similarity Search (CPU version)

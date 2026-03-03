@@ -9,15 +9,15 @@ the relationship between a specific query and a specific chunk.
 """
 
 import threading
-from sentence_transformers import CrossEncoder
+from fastembed import TextRerank
 from backend.core.config import settings
 
 class Reranker:
     """
-    Two-stage retrieval re-ranker using a Cross-Encoder.
+    Two-stage retrieval re-ranker using a Cross-Encoder via FastEmbed.
     Optimized with lazy loading to save memory at startup.
     """
-    def __init__(self, model_name="cross-encoder/ms-marco-TinyBERT-L-2-v2"):
+    def __init__(self, model_name="BAAI/bge-reranker-base"):
         self.model_name = model_name
         self._model = None
         self._lock = threading.Lock()
@@ -27,8 +27,8 @@ class Reranker:
         if self._model is None:
             with self._lock:
                 if self._model is None:  # Double-check
-                    print(f"[Reranker] Loading {self.model_name}...")
-                    self._model = CrossEncoder(self.model_name)
+                    print(f"[Reranker] Loading {self.model_name} via FastEmbed...")
+                    self._model = TextRerank(model_name=self.model_name)
         return self._model
 
     def rerank(self, query: str, chunks: list[dict], top_n: int = 5) -> list[dict]:
@@ -38,18 +38,20 @@ class Reranker:
         if not chunks:
             return []
 
-        # Prepare pairs for the Cross-Encoder: [query, text]
-        pairs = [[query, c["text"]] for c in chunks]
+        # Extract text from chunks for the reranker
+        passages = [c["text"] for c in chunks]
         
-        # Predict relevance scores
-        scores = self.model.predict(pairs)
+        # Predict relevance scores (returns a generator of RerankResult)
+        # Each result has .score and .index
+        results = list(self.model.rerank(query, passages))
         
-        # Attach scores to chunks
-        for i, chunk in enumerate(chunks):
-            chunk["rerank_score"] = float(scores[i])
+        # Re-attach scores to original chunks
+        for result in results:
+            idx = result.index
+            chunks[idx]["rerank_score"] = float(result.score)
             
         # Sort by rerank_score descending
-        ranked_chunks = sorted(chunks, key=lambda x: x["rerank_score"], reverse=True)
+        ranked_chunks = sorted(chunks, key=lambda x: x.get("rerank_score", -999), reverse=True)
         
         return ranked_chunks[:top_n]
 
