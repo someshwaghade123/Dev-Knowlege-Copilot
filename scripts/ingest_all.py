@@ -39,6 +39,19 @@ def load_files_from_folder(folder: Path) -> list[dict]:
     }
     EXCLUDE_FILES = {"main.py", "__init__.py"}
 
+    # ── URL Mapping ────────────────────────────────────────────────────────
+    # Maps specific filenames to their official documentation websites
+    FILE_URL_MAPPING = {
+        "fastapi_getting_started.md": "https://fastapi.tiangolo.com/tutorial/first-steps/",
+        "docker_reference.md": "https://docs.docker.com/get-started/",
+        "vector_databases_guide.md": "https://www.pinecone.io/learn/vector-database/"
+    }
+    
+    # Fallback: Maps local folder prefixes to base documentation URLs (e.g. GitHub)
+    SOURCE_URL_MAPPING = {
+        "data/sample_docs": "https://github.com/someshwaghade123/Dev-Knowlege-Copilot/blob/main/data/sample_docs"
+    }
+
     for file_path in sorted(folder.rglob("*")):
         if file_path.suffix.lower() not in extensions or not file_path.is_file():
             continue
@@ -60,14 +73,35 @@ def load_files_from_folder(folder: Path) -> list[dict]:
         if len(text.strip()) < 50:
             continue
 
+        # Derive source URL
+        source_url = None
+        
+        # Priority 1: Specific File Mapping (Official Docs)
+        if file_path.name in FILE_URL_MAPPING:
+            source_url = FILE_URL_MAPPING[file_path.name]
+        
+        # Priority 2: Folder Mapping (e.g. GitHub)
+        if not source_url:
+            rel_path = file_path.as_posix() # e.g. "data/sample_docs/file.md"
+            for prefix, base_url in SOURCE_URL_MAPPING.items():
+                if rel_path.startswith(prefix):
+                    source_url = f"{base_url}/{file_path.name}"
+                    break
+        
+        # Priority 3: Local file URL
+        if not source_url:
+            source_url = f"file:///{file_path.absolute().as_posix()}"
+
         title = f"{file_path.parent.name}/{file_path.name}"
         docs.append({
             "title": title,
             "text": text,
-            "source_url": None,
+            "source_url": source_url,
             "file_name": file_path.name,
         })
-        print(f"  [Read] {title} ({len(text):,} chars)")
+        print(f"  [Read] {title} -> {source_url}")
+
+
 
     return docs
 
