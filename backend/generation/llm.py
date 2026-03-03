@@ -32,12 +32,28 @@ INTERVIEW TIP:
    triggered to track hallucination rate."
 """
 
+import re
 import time
 import httpx
 from backend.core.config import settings
 
 
+def extract_citation_indices(text: str) -> list[int]:
+    """
+    Parse [1], [2] etc. from the LLM answer to find used indices.
+    Returns 1-based indices found in the text.
+    """
+    # Look for [n] where n is a digit. 
+    # Also handles ranges if the AI produces them? (e.g. [1-3] -> future-proofing)
+    # For now, strict digits.
+    matches = re.findall(r"\[(\d+)\]", text)
+    # Convert to unique sorted integers
+    indices = sorted(list(set(int(m) for m in matches)))
+    return indices
+
+
 def build_prompt(query: str, chunks: list[dict]) -> list[dict]:
+
     """
     Build the messages list for a chat-completion API call.
 

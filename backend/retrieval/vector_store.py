@@ -96,10 +96,25 @@ class VectorStore:
         return assigned_ids
 
     def save(self) -> None:
-        """Persist the index to disk. Includes a safety guard to avoid wiping data."""
+        """Persist the index to disk. Includes safety guards to avoid wiping data."""
         if self._index is None or self._index.ntotal == 0:
             print("[VectorStore] Index is empty. Skipping save to protect existing data.")
             return
+
+        # Safety guard: if the on-disk index is LARGER than what we have in memory,
+        # skip the save. This prevents a stale in-memory copy (e.g. from app startup
+        # before a fresh ingest run) from overwriting a newer index on disk.
+        if self.index_path.exists():
+            try:
+                disk_index = faiss.read_index(str(self.index_path))
+                if disk_index.ntotal > self._index.ntotal:
+                    print(
+                        f"[VectorStore] Disk index ({disk_index.ntotal} vectors) is larger than "
+                        f"in-memory ({self._index.ntotal}). Skipping save to protect newer data."
+                    )
+                    return
+            except Exception:
+                pass  # If we can't read the disk index, proceed with save
 
         self.index_path.parent.mkdir(parents=True, exist_ok=True)
         faiss.write_index(self._index, str(self.index_path))
