@@ -9,7 +9,7 @@ the relationship between a specific query and a specific chunk.
 """
 
 import threading
-from fastembed import TextRerank
+from fastembed import TextCrossEncoder
 from backend.core.config import settings
 
 class Reranker:
@@ -28,7 +28,7 @@ class Reranker:
             with self._lock:
                 if self._model is None:  # Double-check
                     print(f"[Reranker] Loading {self.model_name} via FastEmbed...")
-                    self._model = TextRerank(model_name=self.model_name)
+                    self._model = TextCrossEncoder(model_name=self.model_name)
         return self._model
 
     def rerank(self, query: str, chunks: list[dict], top_n: int = 5) -> list[dict]:
