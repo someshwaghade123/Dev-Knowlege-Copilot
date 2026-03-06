@@ -25,7 +25,7 @@ class Reranker:
     Two-stage retrieval re-ranker using a Cross-Encoder via FastEmbed.
     Optimized with lazy loading to save memory at startup.
     """
-    def __init__(self, model_name="BAAI/bge-reranker-base"):
+    def __init__(self, model_name="Xenova/ms-marco-MiniLM-L-6-v2"):
         self.model_name = model_name
         self._model = None
         self._lock = threading.Lock()
