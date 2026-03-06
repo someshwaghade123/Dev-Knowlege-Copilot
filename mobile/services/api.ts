@@ -30,7 +30,7 @@ const BASE_URL = "http://10.53.167.156:8000/api/v1";
 /**
  * Enhanced fetch with a timeout to prevent infinite "loading" states.
  */
-async function fetchWithTimeout(url: string, options: RequestInit = {}, timeoutMs = 10000) {
+async function fetchWithTimeout(url: string, options: RequestInit = {}, timeoutMs = 60000) {
     const controller = new AbortController();
     const id = setTimeout(() => controller.abort(), timeoutMs);
 
