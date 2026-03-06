@@ -58,6 +58,10 @@ class Reranker:
         # Each result has .score and .index
         results = list(self.model.rerank(query, passages))
         
+        if results:
+            print(f"[Reranker] Query: {query}")
+            print(f"[Reranker] Top score: {results[0].score:.4f} for index {results[0].index}")
+
         # Re-attach scores to original chunks
         for result in results:
             idx = result.index
