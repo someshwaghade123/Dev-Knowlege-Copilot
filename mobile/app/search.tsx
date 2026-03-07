@@ -28,6 +28,35 @@ const CONFIDENCE_COLORS: Record<string, string> = {
 
 // ── Sub-components ────────────────────────────────────────────────────────────
 
+const SearchSkeleton = () => (
+    <View style={styles.skeletonContainer}>
+        <View style={styles.skeletonHeader}>
+            <View style={[styles.skeletonPill, { width: 80 }]} />
+            <View style={[styles.skeletonPill, { width: 120 }]} />
+        </View>
+        <View style={styles.skeletonAnswer}>
+            <View style={[styles.skeletonLine, { width: "90%" }]} />
+            <View style={[styles.skeletonLine, { width: "95%" }]} />
+            <View style={[styles.skeletonLine, { width: "70%" }]} />
+        </View>
+        <View style={styles.sourcesSection}>
+            <View style={[styles.skeletonPill, { width: 100, marginBottom: 12 }]} />
+            <View style={styles.citationsList}>
+                {[1, 2].map((i) => (
+                    <View key={i} style={styles.skeletonCard} />
+                ))}
+            </View>
+        </View>
+    </View>
+);
+
+const MetricPill = ({ icon, text, color = "#64748b" }: { icon: string, text: string, color?: string }) => (
+    <View style={[styles.metricPill, { borderColor: color + "40" }]}>
+        <Text style={styles.metricIcon}>{icon}</Text>
+        <Text style={[styles.metricText, { color }]}>{text}</Text>
+    </View>
+);
+
 const CitationCard: React.FC<{ citation: Citation; index: number }> = ({
     citation,
     index,
@@ -59,21 +88,13 @@ const CitationCard: React.FC<{ citation: Citation; index: number }> = ({
     );
 };
 
-function ConfidenceBadge({ confidence }: { confidence: string }) {
-    return (
-        <View style={[styles.badge, { backgroundColor: CONFIDENCE_COLORS[confidence] ?? "#6b7280" }]}>
-            <Text style={styles.badgeText}>{confidence.toUpperCase()} CONFIDENCE</Text>
-        </View>
-    );
-}
-
 // ── Main Search Screen ────────────────────────────────────────────────────────
 
 export default function SearchScreen() {
     const [query, setQuery] = useState("");
     const [loading, setLoading] = useState(false);
     const [result, setResult] = useState<QueryResponse | null>(null);
-    const [error, setError] = useState<string | null>(null);
+    const [error, setError] = useState<{ message: string, type: "network" | "rate_limit" | "other" } | null>(null);
 
     const handleSearch = async () => {
         const trimmed = query.trim();
@@ -90,7 +111,18 @@ export default function SearchScreen() {
             const response = await queryDocuments(trimmed);
             setResult(response);
         } catch (err: any) {
-            setError(err.message ?? "Something went wrong. Is the backend running?");
+            let type: "network" | "rate_limit" | "other" = "other";
+            let message = err.message ?? "Something went wrong.";
+
+            if (message.includes("429") || message.toLowerCase().includes("rate limit")) {
+                type = "rate_limit";
+                message = "Whoa, slow down! You've hit the rate limit. Please wait a minute.";
+            } else if (message.includes("Aborted") || message.includes("Network request failed")) {
+                type = "network";
+                message = "Connection lost. Please check your internet and backend status.";
+            }
+
+            setError({ message, type });
         } finally {
             setLoading(false);
         }
@@ -128,27 +160,42 @@ export default function SearchScreen() {
                     <Text style={styles.buttonText}>{loading ? "Searching..." : "🔍 Search"}</Text>
                 </TouchableOpacity>
 
-                {/* Loading */}
-                {loading && (
-                    <ActivityIndicator size="large" color="#6366f1" style={{ marginTop: 24 }} />
-                )}
+                {/* Skeleton Loader */}
+                {loading && <SearchSkeleton />}
 
                 {/* Error state */}
                 {error && (
-                    <View style={styles.errorBox}>
-                        <Text style={styles.errorText}>⚠️ {error}</Text>
+                    <View style={[styles.errorBox, error.type === "rate_limit" && styles.rateLimitBox]}>
+                        <Text style={styles.errorText}>
+                            {error.type === "network" ? "🌐" : error.type === "rate_limit" ? "⏳" : "⚠️"} {error.message}
+                        </Text>
+                        {error.type === "network" && (
+                            <TouchableOpacity style={styles.retryButton} onPress={handleSearch}>
+                                <Text style={styles.retryText}>🔄 Retry Connection</Text>
+                            </TouchableOpacity>
+                        )}
                     </View>
                 )}
 
                 {/* Results */}
                 {result && (
                     <View style={styles.resultContainer}>
-                        {/* Summary Header */}
-                        <View style={styles.summaryHeader}>
-                            <ConfidenceBadge confidence={result.confidence} />
-                            <Text style={styles.metricsText}>
-                                {result.latency_ms}ms • {result.tokens_used} tokens
-                            </Text>
+                        {/* Summary Dashboard */}
+                        <View style={styles.metricsDashboard}>
+                            <MetricPill
+                                icon="⏱️"
+                                text={`${result.latency_ms}ms`}
+                                color={result.latency_ms < 300 ? "#22c55e" : "#94a3b8"}
+                            />
+                            <MetricPill
+                                icon="🛡️"
+                                text={result.confidence.toUpperCase()}
+                                color={CONFIDENCE_COLORS[result.confidence]}
+                            />
+                            <MetricPill
+                                icon="💎"
+                                text={`${result.tokens_used} tokens`}
+                            />
                         </View>
 
                         {/* AI Answer Section */}
@@ -215,25 +262,47 @@ const styles = StyleSheet.create({
     },
     buttonText: { color: "#fff", fontSize: 16, fontWeight: "600" },
 
-    errorBox: { backgroundColor: "#450a0a", borderRadius: 8, padding: 12, marginBottom: 16 },
-    errorText: { color: "#fca5a5", fontSize: 14 },
+    // Skeleton
+    skeletonContainer: { gap: 16, marginTop: 8 },
+    skeletonHeader: { flexDirection: "row", gap: 8 },
+    skeletonPill: { height: 22, backgroundColor: "#1e293b", borderRadius: 6 },
+    skeletonAnswer: {
+        backgroundColor: "rgba(30, 41, 59, 0.5)",
+        borderRadius: 16,
+        padding: 16,
+        gap: 8,
+        borderWidth: 1,
+        borderColor: "#1e293b"
+    },
+    skeletonLine: { height: 12, backgroundColor: "#1e293b", borderRadius: 4 },
+    skeletonCard: { height: 100, backgroundColor: "#1e293b", borderRadius: 12 },
 
-    resultContainer: { gap: 16, marginTop: 8 },
-
-    summaryHeader: {
+    // Metrics Dashboard
+    metricsDashboard: {
         flexDirection: "row",
-        alignItems: "center",
-        justifyContent: "space-between",
+        flexWrap: "wrap",
+        gap: 8,
         marginBottom: 8,
     },
-    metricsText: {
-        color: "#64748b",
-        fontSize: 12,
-        fontWeight: "500",
+    metricPill: {
+        flexDirection: "row",
+        alignItems: "center",
+        backgroundColor: "#1e293b",
+        paddingHorizontal: 10,
+        paddingVertical: 6,
+        borderRadius: 20,
+        borderWidth: 1,
     },
+    metricIcon: { fontSize: 12, marginRight: 6 },
+    metricText: { fontSize: 11, fontWeight: "700", letterSpacing: 0.5 },
 
-    badge: { borderRadius: 6, paddingHorizontal: 10, paddingVertical: 4 },
-    badgeText: { color: "#fff", fontSize: 11, fontWeight: "700", letterSpacing: 0.5 },
+    errorBox: { backgroundColor: "#450a0a", borderRadius: 12, padding: 16, marginBottom: 16 },
+    rateLimitBox: { backgroundColor: "#1e1b4b", borderColor: "#3730a3", borderWidth: 1 },
+    errorText: { color: "#fca5a5", fontSize: 14, lineHeight: 20 },
+    retryButton: { marginTop: 12, alignSelf: "flex-start", backgroundColor: "rgba(255,255,255,0.1)", paddingVertical: 8, paddingHorizontal: 12, borderRadius: 8 },
+    retryText: { color: "#fff", fontSize: 13, fontWeight: "600" },
+
+    resultContainer: { gap: 16, marginTop: 8 },
 
     answerSection: {
         backgroundColor: "rgba(99, 102, 241, 0.1)", // Subtle indigo background
