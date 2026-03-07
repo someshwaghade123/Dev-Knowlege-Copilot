@@ -22,7 +22,8 @@ from contextlib import asynccontextmanager
 from fastapi import FastAPI
 from fastapi.middleware.cors import CORSMiddleware
 
-from backend.api.routes import router, limiter
+from backend.api.v1.router import router
+from backend.api.dependencies import limiter
 from backend.db.models import init_db
 from backend.retrieval.vector_store import vector_store
 from slowapi import _rate_limit_exceeded_handler

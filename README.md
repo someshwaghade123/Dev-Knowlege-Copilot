@@ -1,156 +1,144 @@
-# 🧠 Developer Knowledge Copilot
+# Developer Knowledge Copilot
 
-A production-grade AI system that indexes technical documentation and answers developer queries with citations, confidence scores, and latency tracking.
+A production-grade Retrieval-Augmented Generation (RAG) system built to index technical documentation and provide precise, grounded answers with citations and confidence scores.
 
-**Stack**: FastAPI · FAISS · BGE-small embeddings · SQLite · React Native (Expo)
+## 🚀 Features
 
----
+*   **Hybrid Search**: Combines Dense Vector Search (FAISS/BGE) and Sparse Keyword Search (BM25) with Reciprocal Rank Fusion (RRF) for optimal document retrieval.
+*   **Semantic Caching**: Re-uses prior LLM answers for semantically similar queries (>95% similarity) to reduce latency from ~500ms down to <10ms and save API costs.
+*   **Confidence Scoring & Factuality Guards**: Uses Cross-Encoder (`ms-marco-MiniLM-L-6-v2`) reranking and secondary LLM checks to verify hallucination limits. 
+*   **Concurrency & Rate Limiting**: Built with FastAPI, leveraging `asyncio.run_in_executor` for non-blocking ML operations, protecting endpoints with `slowapi` (20 req/min).
+*   **Premium Mobile UI**: Built in React Native (Expo) featuring query skeletons, dynamic metric dashboard pills (Latency, Tokens, Confidence), and robust network retry logic. 
 
-## Quick Start
+## 🏗️ Architecture
 
-### 1. Install dependencies
+```mermaid
+graph TD
+    subgraph Mobile Client "Expo (React Native)"
+        UI[Search Screen]
+        Metrics[Performance Dashboard]
+    end
 
-```bash
-python -m venv venv
-venv\Scripts\activate       # Windows
-pip install -r requirements.txt
+    subgraph Backend "FastAPI (Dockerized)"
+        API[v1/query Endpoint]
+        LLM[OpenRouter / Mistral]
+        Ranker[Cross Encoder Re-ranker]
+        
+        subgraph Caching Layer
+            Cache[(Semantic Cache)]
+        end
+        
+        subgraph Search
+            Hyb[Hybrid Search Engine]
+            VecStore[(FAISS Vector Store)]
+            BM25[(BM25 Keyword Index)]
+        end
+    end
+    
+    subgraph Data
+        Docs[(Raw Documents)] 
+        Meta[(SQLite Metadata DB)]
+    end
+
+    %% Flow
+    UI -- "1. User Query" --> API
+    API -- "2. Embed Query & Check" --> Cache
+    Cache -- "Hit > 0.95" --> UI
+    
+    Cache -- "Miss" --> Hyb
+    Hyb -- "Retrieve" --> VecStore
+    Hyb -- "Retrieve" --> BM25
+    Hyb -- "Merge (RRF)" --> Ranker
+    
+    Ranker -- "Top 5 Chunks" --> LLM
+    LLM -- "Synthesize Answer" --> API
+    
+    API -- "Cache Response" --> Cache
+    API -- "JSON payload w/ Citations" --> UI
 ```
 
-### 2. Configure environment
+## 🛠️ Tech Stack
 
+*   **Backend**: Python, FastAPI, Pydantic
+*   **AI/ML**: Sentence-Transformers, rank_bm25, FAISS (CPU)
+*   **Database**: SQLite (Metadata & Query Logs)
+*   **Mobile**: React Native, Expo, React-Native-Markdown-Display
+*   **DevOps**: Docker, Docker Compose, Locust (Load Testing)
+
+## ⚡ Quickstart
+
+### Prerequisites
+*   Docker & Docker Compose installed.
+*   An [OpenRouter API Key](https://openrouter.ai/).
+
+### 1. Clone & Configure
 ```bash
-copy .env.example .env
-# Edit .env and add your free API key from https://openrouter.ai
+git clone https://github.com/yourusername/dev-knowledge-copilot.git
+cd dev-knowledge-copilot
+```
+Create a `.env` file in the root directory:
+```env
+LLM_API_KEY=sk-or-v1-...
+APP_ENV=production
+LOG_LEVEL=INFO
+SERVER_PORT=8001
+RATE_LIMIT=20/minute
 ```
 
-### 3. Ingest sample documents
-
+### 2. Run the Backend
 ```bash
-python scripts/ingest_docs.py --source data/sample_docs
+docker-compose up --build -d
 ```
+The FastAPI server will be available at `http://localhost:8001`.
+You can view the auto-generated Swagger docs at `http://localhost:8001/docs`.
 
-### 4. Start the backend
-
-```bash
-uvicorn backend.main:app --reload --port 8000
-```
-
-Visit **http://localhost:8000/docs** for interactive API documentation.
-
-### 5. Run the mobile app
-
+### 3. Run the Mobile App
 ```bash
 cd mobile
-npx create-expo-app@latest .    # First time only
-npm start
-# Scan QR with Expo Go on your phone
+npm install
+npx expo start
 ```
+Scan the QR code with the Expo Go app on your phone, or press `a` or `i` to run on a local Android/iOS emulator.
 
----
+## 📚 API Reference
 
-## API Reference
-
-| Method | Endpoint | Description |
-|--------|----------|-------------|
-| `GET` | `/api/v1/health` | Liveness check + indexed vector count |
-| `POST` | `/api/v1/query` | Ask a question, get answer + citations |
-| `GET` | `/api/v1/documents` | List all indexed docs + stats (chunk count, tokens) |
-
-### POST /api/v1/query
-
-The query endpoint uses a **two-stage retrieval pipeline**:
-1. **Hybrid Search**: Combines BM25 and Vector search for high recall.
-2. **Re-ranking**: Uses a Cross-Encoder (`TinyBERT`) to ensure high precision.
-3. **Factuality Guard**: A second-pass LLM self-check to prevent hallucinations.
-
+### `POST /api/v1/query`
+Main RAG querying endpoint. Includes rate limiting.
+**Request Body**:
 ```json
-// Request
 {
   "query": "How do I configure CORS in FastAPI?",
-  "top_k": 5
+  "top_k": 5,
+  "search_mode": "hybrid",
+  "min_confidence": "medium"
 }
-
-// Response
+```
+**Response**:
+```json
 {
-  "answer": "Use CORSMiddleware from fastapi.middleware.cors...",
+  "answer": "To configure CORS in FastAPI...",
   "citations": [
     {
-      "title": "FastAPI Getting Started",
-      "source_url": null,
-      "text_preview": "from fastapi.middleware.cors import CORSMiddleware..."
+      "title": "FastAPI Deployment",
+      "source_url": "https://fastapi.tiangolo.com/tutorial/cors/",
+      "text_preview": "CORS or Cross-Origin Resource Sharing..."
     }
   ],
   "confidence": "high",
   "latency_ms": 482,
-  "tokens_used": 347
+  "tokens_used": 150
 }
 ```
 
----
+### `GET /api/v1/health`
+Kubernetes/Docker readiness probe returning the status of the DB and Vector Store.
 
-## Run Tests
+### `GET /api/v1/metrics`
+Returns aggregate performance statistics across all logged queries (p50/p95 latency, total tokens used, and specific pipeline timings for embedding, LLM, and retrieval phases).
 
-```bash
-# Week 1 tests
-pytest backend/tests/test_week1.py -v
 
-# Week 5 tests (Re-ranking, Scoring, Factuality)
-pytest backend/tests/test_week5.py -v
-```
+## 🧪 Benchmarking & Load Testing
+The system was load-tested using **Locust** with **50 concurrent users**, achieving **0% failure rate** and a median latency of **4ms** (powered by the semantic cache). See `docs/week7/load_test.md` for full results.
 
----
-
-## Docker
-
-```bash
-# Build
-docker build -t dev-copilot:latest .
-
-# Run
-docker run -p 8000:8000 --env-file .env dev-copilot:latest
-```
-
----
-
-## Project Structure
-
-```
-├── backend/
-│   ├── api/routes.py         ← HTTP endpoints (Query, Health, Docs)
-│   ├── core/config.py        ← Settings (pydantic-settings)
-│   ├── db/models.py          ← SQLite schema + Query Logs
-│   ├── ingestion/
-│   │   ├── chunker.py        ← Structural Code Chunking (.py, .js)
-│   │   └── embedder.py       ← BGE-small-en-v1.5 embeddings
-│   ├── retrieval/
-│   │   ├── vector_store.py   ← FAISS IndexFlatIP
-│   │   ├── hybrid.py        ← BM25 + Vector Fusion
-│   │   └── reranker.py       ← Cross-Encoder Re-ranking
-│   ├── scoring/
-│   │   └── engine.py         ← Centralized Confidence Engine
-│   ├── generation/
-│   │   └── llm.py            ← LLM + Factuality Guard
-│   └── main.py               ← App entry point
-├── mobile/
-│   ├── app/search.tsx        ← Premium Results UI
-│   └── services/api.ts       ← Backend API calls
-├── scripts/ingest_docs.py    ← Code-aware ingestion script
-└── data/sample_docs/         ← Sample documents
-```
-
----
-
----
-
-## Roadmap
-
-| Week | Focus |
-|------|-------|
-| ✅ 1 | Basic RAG — chunking, embeddings, FAISS, citations |
-| ✅ 2 | Advanced Citations + Mobile UI + Code Ingestion |
-| ✅ 3 | Hybrid search (BM25 + Vector) |
-| ✅ 4 | Latency metrics + request logging |
-| ✅ 5 | Confidence scoring + re-ranking + Factuality Guard |
-| 📅 6 | Redis caching + benchmarks |
-| 📅 7 | Load testing (50 concurrent users) |
-| 📅 8 | Deploy to Render + Expo APK build |
+## 📝 License
+MIT License
