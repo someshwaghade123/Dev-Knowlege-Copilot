@@ -10,9 +10,9 @@
 # ── Stage 1: Base setup ───────────────────────────────────────────────────────
 FROM python:3.11-slim as base
 
-# Install system dependencies (libgomp1 is required for ONNX runtime/fastembed)
+# Install system dependencies
 RUN apt-get update && apt-get install -y --no-install-recommends \
-  libgomp1 \
+  build-essential \
   && rm -rf /var/lib/apt/lists/*
 
 # Prevents Python from writing .pyc files (keeps image smaller)
@@ -40,5 +40,5 @@ RUN sed -i 's/\r$//' /app/backend/start.sh && chmod +x /app/backend/start.sh
 # ── Runtime configuration ────────────────────────────────────────────────────
 EXPOSE 8001 10000
 
-# Use the startup script to download models before starting uvicorn
+# Start the server using the optimized startup script
 CMD ["/app/backend/start.sh"]

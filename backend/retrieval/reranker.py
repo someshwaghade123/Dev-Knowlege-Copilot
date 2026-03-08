@@ -9,68 +9,78 @@ the relationship between a specific query and a specific chunk.
 """
 
 import threading
-try:
-    from fastembed import TextCrossEncoder
-except ImportError:
-    try:
-        from fastembed.rerank.cross_encoder import TextCrossEncoder
-    except ImportError:
-        # If both fail, we'll raise a clear error later during lazy loading
-        TextCrossEncoder = None
-
+import cohere
 from backend.core.config import settings
 
 class Reranker:
     """
-    Two-stage retrieval re-ranker using a Cross-Encoder via FastEmbed.
-    Optimized with lazy loading to save memory at startup.
+    Two-stage retrieval re-ranker using Cohere's Rerank API.
+    Offers superior accuracy with zero local memory footprint.
     """
-    def __init__(self, model_name="Xenova/ms-marco-MiniLM-L-6-v2"):
+    def __init__(self, model_name="rerank-english-v3.0"):
         self.model_name = model_name
-        self._model = None
+        self._client = None
         self._lock = threading.Lock()
 
     @property
-    def model(self):
-        if self._model is None:
-            if TextCrossEncoder is None:
-                raise ImportError(
-                    "Could not import TextCrossEncoder from fastembed. "
-                    "Ensure fastembed >= 0.4.2 is installed."
-                )
+    def client(self):
+        """Lazy-load the Cohere client."""
+        if self._client is None:
             with self._lock:
-                if self._model is None:  # Double-check
-                    print(f"[Reranker] Loading {self.model_name} via FastEmbed...")
-                    self._model = TextCrossEncoder(model_name=self.model_name)
-        return self._model
+                if self._client is None:
+                    if not settings.cohere_api_key or "your_" in settings.cohere_api_key:
+                        # We return None so the system can gracefully degrade to hybrid-only
+                        return None
+                    self._client = cohere.Client(api_key=settings.cohere_api_key)
+        return self._client
+
+    @property
+    def model(self):
+        """Compatibility shim for main.py pre-loading."""
+        if self.client:
+            print("[Reranker] Cohere client initialised.")
+        else:
+            print("[Reranker] Warning: COHERE_API_KEY not found. Reranking will be bypassed.")
+        return self.client
 
     def rerank(self, query: str, chunks: list[dict], top_n: int = 5) -> list[dict]:
         """
-        Re-score a list of chunks based on their semantic relevance to the query.
+        Re-score chunks using Cohere.
         """
         if not chunks:
             return []
 
-        # Extract text from chunks for the reranker
+        if self.client is None:
+            print("[Reranker] Bypassing rerank: Client not initialised.")
+            return chunks[:top_n]
+
+        # Extract text from chunks
         passages = [c["text"] for c in chunks]
         
-        # Predict relevance scores (returns a generator of RerankResult)
-        # Each result has .score and .index
-        results = list(self.model.rerank(query, passages))
-        
-        if results:
-            print(f"[Reranker] Query: {query}")
-            print(f"[Reranker] Top score: {results[0].score:.4f} for index {results[0].index}")
-
-        # Re-attach scores to original chunks
-        for result in results:
-            idx = result.index
-            chunks[idx]["rerank_score"] = float(result.score)
+        try:
+            results = self.client.rerank(
+                query=query,
+                documents=passages,
+                top_n=top_n,
+                model=self.model_name
+            )
             
-        # Sort by rerank_score descending
-        ranked_chunks = sorted(chunks, key=lambda x: x.get("rerank_score", -999), reverse=True)
-        
-        return ranked_chunks[:top_n]
+            # Map results back to original chunks
+            final_chunks = []
+            for res in results.results:
+                chunk = chunks[res.index]
+                chunk["rerank_score"] = float(res.relevance_score)
+                final_chunks.append(chunk)
+
+            if final_chunks:
+                print(f"[Reranker] Query: {query}")
+                print(f"[Reranker] Top Cohere score: {final_chunks[0]['rerank_score']:.4f}")
+
+            return final_chunks
+
+        except Exception as e:
+            print(f"[Reranker] Error during Cohere rerank: {e}")
+            return chunks[:top_n]
 
 # Singleton instance
 reranker = Reranker()

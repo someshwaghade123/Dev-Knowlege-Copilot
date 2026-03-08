@@ -23,9 +23,13 @@ class Settings(BaseSettings):
     llm_base_url: str = "https://openrouter.ai/api/v1"
     llm_model: str = "mistralai/mistral-7b-instruct"
 
+    # ── External APIs ────────────────────────────────────────────────────────
+    openai_api_key: str | None = None
+    cohere_api_key: str | None = None
+
     # ── Embeddings ───────────────────────────────────────────────────────────
-    embed_model: str = "BAAI/bge-small-en-v1.5"
-    embed_dimension: int = 384   # Must match the chosen model's output size
+    embed_model: str = "text-embedding-3-small"
+    embed_dimension: int = 1536   # Must match text-embedding-3-small
 
     # ── Storage ──────────────────────────────────────────────────────────────
     # We resolve paths as absolute to avoid issues with running from different dirs

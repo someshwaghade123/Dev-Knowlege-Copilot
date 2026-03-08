@@ -10,10 +10,9 @@ pdfplumber==0.11.9             # PDF text extraction
 python-docx==1.2.0             # Word (.docx) extraction
 python-pptx==1.0.2             # PowerPoint (.pptx) extraction
 
-# ── Embeddings ─────────────────────────────────────────────────────────────────
-fastembed==0.7.4               # Lightweight ONNX-based embeddings and rerankers
-qdrant-client>=1.11.0         # Often required for fastembed rerank extras
-onnxruntime==1.17.1            # Engine for fastembed (CPU)
+# ── Embeddings & Reranking (API) ──────────────────────────────────────────────
+openai>=1.12.0                 # OpenAI API client for embeddings
+cohere>=4.45                   # Cohere API client for reranking
 numpy<2.0.0                    # Required for compatibility with FAISS
 
 # ── Vector Search ──────────────────────────────────────────────────────────────
