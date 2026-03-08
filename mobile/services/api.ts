@@ -143,3 +143,28 @@ export async function uploadDocument(
 
     return response.json();
 }
+
+/**
+ * POST /api/v1/documents/upload-text
+ * Send raw pasted text as JSON for instant indexing.
+ * Avoids URL.createObjectURL which does not work in React Native.
+ */
+export async function uploadText(
+    text: string,
+    name?: string
+): Promise<{ message: string; file_name: string; chunks_processed: number }> {
+    const response = await fetchWithTimeout(
+        `${BASE_URL}/documents/upload-text`,
+        {
+            method: "POST",
+            headers: { "Content-Type": "application/json" },
+            body: JSON.stringify({ text, name: name || "pasted_document.txt" }),
+        },
+        90000
+    );
+    if (!response.ok) {
+        const error = await response.json().catch(() => ({}));
+        throw new Error(error.detail ?? `Upload failed: ${response.status}`);
+    }
+    return response.json();
+}

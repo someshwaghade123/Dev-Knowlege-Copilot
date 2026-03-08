@@ -16,9 +16,9 @@ import {
     Alert,
     Linking,
 } from "react-native";
-import * as DocumentPicker from "expo-document-picker";
 import Markdown from "react-native-markdown-display";
-import { queryDocuments, uploadDocument, QueryResponse, Citation } from "../services/api";
+import { queryDocuments, QueryResponse, Citation } from "../services/api";
+import UploadSheet from "../components/UploadSheet";
 
 // ── Confidence badge colors ────────────────────────────────────────────────────
 const CONFIDENCE_COLORS: Record<string, string> = {
@@ -94,64 +94,9 @@ const CitationCard: React.FC<{ citation: Citation; index: number }> = ({
 export default function SearchScreen() {
     const [query, setQuery] = useState("");
     const [loading, setLoading] = useState(false);
-    const [uploading, setUploading] = useState(false);
+    const [showUploadSheet, setShowUploadSheet] = useState(false);
     const [result, setResult] = useState<QueryResponse | null>(null);
     const [error, setError] = useState<{ message: string, type: "network" | "rate_limit" | "other" } | null>(null);
-
-    const handleUpload = async () => {
-        try {
-            const result = await DocumentPicker.getDocumentAsync({
-                type: [
-                    'text/plain', 'text/markdown', 'text/x-python',
-                    'text/javascript', 'text/typescript', 'text/x-rst',
-                    'application/pdf',
-                    'application/vnd.openxmlformats-officedocument.wordprocessingml.document',
-                    'application/vnd.openxmlformats-officedocument.presentationml.presentation',
-                    '*/*'
-                ],
-                copyToCacheDirectory: true,
-            });
-
-            if (result.canceled) return;
-
-            const file = result.assets[0];
-            const SUPPORTED = [
-                // Documents
-                '.md', '.txt', '.rst',
-                // Rich formats
-                '.pdf', '.docx', '.pptx',
-                // Web / Scripting
-                '.py', '.js', '.ts', '.tsx', '.jsx', '.rb', '.php',
-                // JVM / Compiled
-                '.java', '.kt', '.scala', '.cs',
-                // Systems
-                '.go', '.rs', '.c', '.cpp', '.cc', '.h', '.hpp',
-                // Mobile / Other
-                '.swift', '.r', '.lua', '.sh',
-            ];
-            const ext = '.' + file.name.split('.').pop()?.toLowerCase();
-
-            if (!SUPPORTED.includes(ext)) {
-                Alert.alert("Unsupported File", `Please upload one of: ${SUPPORTED.join(', ')}`);
-                return;
-            }
-
-            setUploading(true);
-            setError(null);
-
-            const uploadRes = await uploadDocument(file.uri, file.name, file.mimeType || 'text/plain');
-
-            Alert.alert(
-                "Upload Complete",
-                `Indexed ${uploadRes.chunks_processed} chunks from ${uploadRes.file_name}`
-            );
-
-        } catch (err: any) {
-            setError({ message: err.message || "Failed to upload document", type: "other" });
-        } finally {
-            setUploading(false);
-        }
-    };
 
     const handleSearch = async () => {
         const trimmed = query.trim();
@@ -186,119 +131,124 @@ export default function SearchScreen() {
     };
 
     return (
-        <SafeAreaView style={styles.safeArea}>
-            <ScrollView contentContainerStyle={styles.container} keyboardShouldPersistTaps="handled">
+        <>
+            <SafeAreaView style={styles.safeArea}>
+                <ScrollView contentContainerStyle={styles.container} keyboardShouldPersistTaps="handled">
 
-                {/* Header with Upload Button */}
-                <View style={styles.headerRow}>
-                    <View>
+                    {/* Header */}
+                    <View style={styles.headerCenter}>
                         <Text style={styles.header}>🧠 Dev Knowledge Copilot</Text>
                         <Text style={styles.subtitle}>Ask anything about your technical docs</Text>
                     </View>
-                    <TouchableOpacity
-                        style={styles.uploadButton}
-                        onPress={handleUpload}
-                        disabled={loading || uploading}
-                    >
-                        {uploading ? (
-                            <ActivityIndicator color="#6366f1" size="small" />
-                        ) : (
-                            <Text style={styles.uploadIcon}>📁</Text>
-                        )}
-                    </TouchableOpacity>
-                </View>
 
-                {/* Search input */}
-                <View style={styles.inputRow}>
-                    <TextInput
-                        style={styles.input}
-                        placeholder="e.g. How do I configure CORS in FastAPI?"
-                        placeholderTextColor="#9ca3af"
-                        value={query}
-                        onChangeText={setQuery}
-                        multiline
-                        returnKeyType="search"
-                        onSubmitEditing={handleSearch}
-                        accessibilityLabel="Query input"
+                    {/* Upload Sheet Modal */}
+                    <UploadSheet
+                        visible={showUploadSheet}
+                        onClose={() => setShowUploadSheet(false)}
                     />
-                </View>
 
-                <TouchableOpacity
-                    style={styles.button}
-                    onPress={handleSearch}
-                    disabled={loading}
-                    accessibilityLabel="Search button"
-                >
-                    <Text style={styles.buttonText}>{loading ? "Searching..." : "🔍 Search"}</Text>
-                </TouchableOpacity>
-
-                {/* Skeleton Loader */}
-                {loading && <SearchSkeleton />}
-
-                {/* Error state */}
-                {error && (
-                    <View style={[styles.errorBox, error.type === "rate_limit" && styles.rateLimitBox]}>
-                        <Text style={styles.errorText}>
-                            {error.type === "network" ? "🌐" : error.type === "rate_limit" ? "⏳" : "⚠️"} {error.message}
-                        </Text>
-                        {error.type === "network" && (
-                            <TouchableOpacity style={styles.retryButton} onPress={handleSearch}>
-                                <Text style={styles.retryText}>🔄 Retry Connection</Text>
-                            </TouchableOpacity>
-                        )}
+                    {/* Search input */}
+                    <View style={styles.inputRow}>
+                        <TextInput
+                            style={styles.input}
+                            placeholder="e.g. How do I configure CORS in FastAPI?"
+                            placeholderTextColor="#9ca3af"
+                            value={query}
+                            onChangeText={setQuery}
+                            multiline
+                            returnKeyType="search"
+                            onSubmitEditing={handleSearch}
+                            accessibilityLabel="Query input"
+                        />
                     </View>
-                )}
 
-                {/* Results */}
-                {result && (
-                    <View style={styles.resultContainer}>
-                        {/* Summary Dashboard */}
-                        <View style={styles.metricsDashboard}>
-                            <MetricPill
-                                icon="⏱️"
-                                text={`${result.latency_ms}ms`}
-                                color={result.latency_ms < 300 ? "#22c55e" : "#94a3b8"}
-                            />
-                            <MetricPill
-                                icon="🛡️"
-                                text={result.confidence.toUpperCase()}
-                                color={CONFIDENCE_COLORS[result.confidence]}
-                            />
-                            <MetricPill
-                                icon="💎"
-                                text={`${result.tokens_used} tokens`}
-                            />
+                    <TouchableOpacity
+                        style={styles.button}
+                        onPress={handleSearch}
+                        disabled={loading}
+                        accessibilityLabel="Search button"
+                    >
+                        <Text style={styles.buttonText}>{loading ? "Searching..." : "🔍 Search"}</Text>
+                    </TouchableOpacity>
+
+                    {/* Skeleton Loader */}
+                    {loading && <SearchSkeleton />}
+
+                    {/* Error state */}
+                    {error && (
+                        <View style={[styles.errorBox, error.type === "rate_limit" && styles.rateLimitBox]}>
+                            <Text style={styles.errorText}>
+                                {error.type === "network" ? "🌐" : error.type === "rate_limit" ? "⏳" : "⚠️"} {error.message}
+                            </Text>
+                            {error.type === "network" && (
+                                <TouchableOpacity style={styles.retryButton} onPress={handleSearch}>
+                                    <Text style={styles.retryText}>🔄 Retry Connection</Text>
+                                </TouchableOpacity>
+                            )}
                         </View>
+                    )}
 
-                        {/* AI Answer Section */}
-                        <View style={styles.answerSection}>
-                            <View style={styles.sectionHeader}>
-                                <Text style={styles.sectionLabel}>AI ANSWER</Text>
-                                <Text style={styles.sparkleIcon}>✨</Text>
+                    {/* Results */}
+                    {result && (
+                        <View style={styles.resultContainer}>
+                            {/* Summary Dashboard */}
+                            <View style={styles.metricsDashboard}>
+                                <MetricPill
+                                    icon="⏱️"
+                                    text={`${result.latency_ms}ms`}
+                                    color={result.latency_ms < 300 ? "#22c55e" : "#94a3b8"}
+                                />
+                                <MetricPill
+                                    icon="🛡️"
+                                    text={result.confidence.toUpperCase()}
+                                    color={CONFIDENCE_COLORS[result.confidence]}
+                                />
+                                <MetricPill
+                                    icon="💎"
+                                    text={`${result.tokens_used} tokens`}
+                                />
                             </View>
 
-                            <View style={{ flex: 1 }}>
-                                <Markdown style={markdownStyles}>
-                                    {result.answer}
-                                </Markdown>
-                            </View>
-                        </View>
+                            {/* AI Answer Section */}
+                            <View style={styles.answerSection}>
+                                <View style={styles.sectionHeader}>
+                                    <Text style={styles.sectionLabel}>AI ANSWER</Text>
+                                    <Text style={styles.sparkleIcon}>✨</Text>
+                                </View>
 
-                        {/* Sources Section */}
-                        {result.citations.length > 0 && (
-                            <View style={styles.sourcesSection}>
-                                <Text style={styles.sectionLabel}>SOURCES ({result.citations.length})</Text>
-                                <View style={styles.citationsList}>
-                                    {result.citations.map((c: Citation, i: number) => (
-                                        <CitationCard key={i} citation={c} index={i} />
-                                    ))}
+                                <View style={{ flex: 1 }}>
+                                    <Markdown style={markdownStyles}>
+                                        {result.answer}
+                                    </Markdown>
                                 </View>
                             </View>
-                        )}
-                    </View>
-                )}
-            </ScrollView>
-        </SafeAreaView>
+
+                            {/* Sources Section */}
+                            {result.citations.length > 0 && (
+                                <View style={styles.sourcesSection}>
+                                    <Text style={styles.sectionLabel}>SOURCES ({result.citations.length})</Text>
+                                    <View style={styles.citationsList}>
+                                        {result.citations.map((c: Citation, i: number) => (
+                                            <CitationCard key={i} citation={c} index={i} />
+                                        ))}
+                                    </View>
+                                </View>
+                            )}
+                        </View>
+                    )}
+                </ScrollView>
+            </SafeAreaView>
+
+            {/* Floating Action Button */}
+            <TouchableOpacity
+                style={styles.fab}
+                onPress={() => setShowUploadSheet(true)}
+                activeOpacity={0.85}
+            >
+                <Text style={styles.fabIcon}>⊕</Text>
+                <Text style={styles.fabText}>Add Docs</Text>
+            </TouchableOpacity>
+        </>
     );
 }
 
@@ -308,27 +258,34 @@ const styles = StyleSheet.create({
     safeArea: { flex: 1, backgroundColor: "#0f172a" },
     container: { padding: 20, paddingBottom: 40, flexGrow: 1 },
 
-    headerRow: {
-        flexDirection: "row",
-        justifyContent: "space-between",
-        alignItems: "flex-start",
-        marginTop: 12,
-        marginBottom: 24
-    },
-    header: { fontSize: 26, fontWeight: "bold", color: "#f8fafc" },
-    subtitle: { fontSize: 13, color: "#94a3b8", marginTop: 4 },
-
-    uploadButton: {
-        backgroundColor: "rgba(99, 102, 241, 0.15)",
-        borderWidth: 1,
-        borderColor: "rgba(99, 102, 241, 0.3)",
-        borderRadius: 12,
-        width: 44,
-        height: 44,
-        justifyContent: "center",
+    headerCenter: {
         alignItems: "center",
+        marginTop: 12,
+        marginBottom: 24,
     },
-    uploadIcon: { fontSize: 20 },
+    header: { fontSize: 24, fontWeight: "bold", color: "#f8fafc", textAlign: "center" },
+    subtitle: { fontSize: 13, color: "#94a3b8", textAlign: "center", marginTop: 4 },
+
+    // Floating Action Button
+    fab: {
+        position: "absolute",
+        bottom: 32,
+        right: 20,
+        flexDirection: "row",
+        alignItems: "center",
+        backgroundColor: "#6366f1",
+        borderRadius: 28,
+        paddingHorizontal: 18,
+        paddingVertical: 13,
+        shadowColor: "#6366f1",
+        shadowOffset: { width: 0, height: 4 },
+        shadowOpacity: 0.5,
+        shadowRadius: 10,
+        elevation: 8,
+        gap: 6,
+    },
+    fabIcon: { fontSize: 20, color: "#fff" },
+    fabText: { color: "#fff", fontWeight: "700", fontSize: 14 },
 
     inputRow: {
         backgroundColor: "#1e293b",

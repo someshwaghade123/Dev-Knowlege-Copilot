@@ -9,7 +9,45 @@ from backend.ingestion.embedder import embed_texts
 from backend.retrieval.vector_store import vector_store
 from backend.retrieval.bm25_store import bm25_store
 
+from pydantic import BaseModel
+
 router = APIRouter()
+
+class TextUploadRequest(BaseModel):
+    text: str
+    name: str = "pasted_document.txt"
+
+async def _index_content(content: str, doc_name: str, file_ext: str, loop) -> dict:
+    """Shared indexing logic for both file upload and text upload endpoints."""
+    if file_ext in CODE_FORMATS:
+        chunks = chunk_code(content, doc_name, doc_title=doc_name)
+    else:
+        chunks = chunk_document(content, doc_title=doc_name)
+
+    if not chunks:
+        raise ValueError("Could not extract any text chunks from the content.")
+
+    chunk_texts = [c.text for c in chunks]
+
+    embed_start = time.perf_counter()
+    embeddings = await loop.run_in_executor(None, embed_texts, chunk_texts)
+    print(f"[Upload] Embedded {len(chunks)} chunks in {time.perf_counter() - embed_start:.2f}s")
+
+    doc_id = await loop.run_in_executor(None, insert_document, doc_name, None, doc_name)
+    start_faiss_id = vector_store._index.ntotal if vector_store._index else 0
+
+    for i, chunk in enumerate(chunks):
+        faiss_id = start_faiss_id + i
+        await loop.run_in_executor(None, insert_chunk, doc_id, faiss_id, i, chunk.text, chunk.token_count)
+
+    vector_store.add_embeddings(embeddings)
+    vector_store.save()
+
+    all_chunks = await loop.run_in_executor(None, get_all_chunks)
+    await loop.run_in_executor(None, bm25_store.build_index, all_chunks)
+
+    return {"message": "Indexed successfully.", "file_name": doc_name, "chunks_processed": len(chunks)}
+
 
 @router.get("/documents", response_model=DocumentsListResponse)
 async def list_documents():
@@ -52,57 +90,35 @@ async def upload_document(file: UploadFile = File(...)):
         raise HTTPException(status_code=500, detail=str(re))
 
     loop = asyncio.get_running_loop()
-
     try:
-        # 1b. Chunking — code files get structural chunking
-        if file_ext in CODE_FORMATS:
-            chunks = chunk_code(content, file.filename, doc_title=file.filename)
-        else:
-            chunks = chunk_document(content, doc_title=file.filename)
-        if not chunks:
-            raise HTTPException(status_code=400, detail="Could not extract any text chunks from the file.")
-
-        chunk_texts = [c.text for c in chunks]
-
-        # 2. Embedding
-        embed_start = time.perf_counter()
-        embeddings = await loop.run_in_executor(None, embed_texts, chunk_texts)
-        print(f"[Upload] Embedded {len(chunks)} chunks in {time.perf_counter() - embed_start:.2f}s")
-
-        # 3. Database & FAISS Insertion
-        doc_id = await loop.run_in_executor(None, insert_document, file.filename, None, file.filename)
-        
-        # We need the current FAISS ID offset to map chunks correctly
-        start_faiss_id = vector_store._index.ntotal if vector_store._index else 0
-        
-        for i, chunk in enumerate(chunks):
-            faiss_id = start_faiss_id + i
-            await loop.run_in_executor(
-                None, 
-                insert_chunk, 
-                doc_id, 
-                faiss_id, 
-                i, 
-                chunk.text, 
-                chunk.token_count
-            )
-
-        # Update FAISS
-        vector_store.add_embeddings(embeddings)
-        vector_store.save()
-
-        # 4. Update BM25
-        # The easiest way for now is to fully rebuild the BM25 index from the DB,
-        # ensuring it stays perfectly in sync.
-        all_chunks = await loop.run_in_executor(None, get_all_chunks)
-        await loop.run_in_executor(None, bm25_store.build_index, all_chunks)
-
-        return {
-            "message": "File successfully uploaded and indexed.",
-            "file_name": file.filename,
-            "chunks_processed": len(chunks)
-        }
-
+        return await _index_content(content, file.filename, file_ext, loop)
+    except ValueError as e:
+        raise HTTPException(status_code=400, detail=str(e))
     except Exception as e:
         print(f"[Upload Error] {e}")
         raise HTTPException(status_code=500, detail=f"Failed to index document: {e}")
+
+
+@router.post("/documents/upload-text")
+async def upload_text(body: TextUploadRequest):
+    """
+    Index raw text pasted directly from the mobile app.
+    Accepts a JSON body with 'text' and optional 'name'.
+    This avoids the need to create a fake file URI in React Native.
+    """
+    if not body.text.strip():
+        raise HTTPException(status_code=400, detail="Text body cannot be empty.")
+
+    safe_name = body.name.strip() or "pasted_document.txt"
+    if not any(safe_name.endswith(ext) for ext in [".txt", ".md", ".py", ".js"]):
+        safe_name = safe_name + ".txt"
+
+    file_ext = "." + safe_name.rsplit(".", 1)[-1].lower()
+    loop = asyncio.get_running_loop()
+    try:
+        return await _index_content(body.text, safe_name, file_ext, loop)
+    except ValueError as e:
+        raise HTTPException(status_code=400, detail=str(e))
+    except Exception as e:
+        print(f"[UploadText Error] {e}")
+        raise HTTPException(status_code=500, detail=f"Failed to index text: {e}")
