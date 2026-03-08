@@ -168,3 +168,20 @@ export async function uploadText(
     }
     return response.json();
 }
+
+/**
+ * DELETE /api/v1/documents/{id}
+ * Deletes a document from the knowledge base.
+ */
+export async function deleteDocument(docId: number): Promise<{ message: string }> {
+    const response = await fetchWithTimeout(`${BASE_URL}/documents/${docId}`, {
+        method: "DELETE",
+    });
+
+    if (!response.ok) {
+        const error = await response.json().catch(() => ({}));
+        throw new Error(error.detail ?? `Delete failed: ${response.status}`);
+    }
+
+    return response.json();
+}

@@ -64,19 +64,48 @@ class VectorStore:
         """
         if self.index_path.exists():
             print(f"[VectorStore] Loading existing index from {self.index_path}")
-            self._index = faiss.read_index(str(self.index_path))
-            self._next_id = self._index.ntotal   # Resume ID counter
+            loaded_index = faiss.read_index(str(self.index_path))
+            
+            # Ensure it's an ID map (to support deletion)
+            if not isinstance(loaded_index, faiss.IndexIDMap):
+                print(f"[VectorStore] Legacy index format detected ({type(loaded_index)}). Upgrading...")
+                # FAISS IndexIDMap must wrap an EMPTY index.
+                # If the loaded index already has data, we reconstruct and re-index.
+                new_index = faiss.IndexIDMap(faiss.IndexFlatIP(self.dimension))
+                if loaded_index.ntotal > 0:
+                    # Legacy indices used sequential IDs (0..N-1) by default.
+                    # We reconstruct vectors and add them with these same IDs to maintain DB sync.
+                    xb = np.zeros((loaded_index.ntotal, self.dimension), dtype='float32')
+                    for i in range(loaded_index.ntotal):
+                        xb[i] = loaded_index.reconstruct(i)
+                    ids = np.arange(loaded_index.ntotal, dtype='int64')
+                    new_index.add_with_ids(xb, ids)
+                    print(f"[VectorStore] Migrated {loaded_index.ntotal} vectors to ID map.")
+                self._index = new_index
+                self._next_id = self._index.ntotal
+            else:
+                self._index = loaded_index
+                # Monotonic ID resumption: Find the highest ID assigned so far.
+                # IndexIDMap stores IDs in the id_map LongVector.
+                try:
+                    ids = faiss.vector_to_array(self._index.id_map)
+                    self._next_id = int(ids.max()) + 1 if ids.size > 0 else 0
+                except Exception as e:
+                    print(f"[VectorStore] Warning: Could not derive next_id from map ({e}). Falling back to ntotal.")
+                    self._next_id = self._index.ntotal
             print(f"[VectorStore] Loaded {self._next_id} vectors.")
         else:
             print("[VectorStore] Creating new empty index.")
-            self._index = faiss.IndexFlatIP(self.dimension)
+            # Wrap standard FlatIP index in an ID map to allow stable IDs and deletion
+            base_index = faiss.IndexFlatIP(self.dimension)
+            self._index = faiss.IndexIDMap(base_index)
             self._next_id = 0
 
     # ── Adding vectors ───────────────────────────────────────────────────────
 
     def add_embeddings(self, embeddings: np.ndarray) -> list[int]:
         """
-        Add a batch of embeddings to the index.
+        Add a batch of embeddings to the index with explicit IDs.
 
         Args:
             embeddings: float32 array of shape (N, dimension)
@@ -88,29 +117,46 @@ class VectorStore:
         assert embeddings.dtype == np.float32
 
         n = len(embeddings)
-        assigned_ids = list(range(self._next_id, self._next_id + n))
+        assigned_ids = np.array(range(self._next_id, self._next_id + n), dtype=np.int64)
 
-        self._index.add(embeddings)   # FAISS adds in order, no explicit IDs
+        self._index.add_with_ids(embeddings, assigned_ids)
         self._next_id += n
 
-        return assigned_ids
+        return assigned_ids.tolist()
 
-    def save(self) -> None:
-        """Persist the index to disk. Includes safety guards to avoid wiping data."""
+    def remove_ids(self, faiss_ids: list[int]) -> None:
+        """
+        Remove specific vectors from the index by their IDs.
+        """
+        if not faiss_ids:
+            return
+
+        assert self._index is not None, "Call load_or_create() first."
+        
+        ids_to_remove = np.array(faiss_ids, dtype=np.int64)
+        self._index.remove_ids(ids_to_remove)
+        print(f"[VectorStore] Removed {len(faiss_ids)} vectors.")
+
+    def save(self, force: bool = False) -> None:
+        """
+        Persist the index to disk.
+        Includes safety guards to avoid wiping data unless 'force' is True.
+        """
         if self._index is None or self._index.ntotal == 0:
             print("[VectorStore] Index is empty. Skipping save to protect existing data.")
             return
 
         # Safety guard: if the on-disk index is LARGER than what we have in memory,
-        # skip the save. This prevents a stale in-memory copy (e.g. from app startup
-        # before a fresh ingest run) from overwriting a newer index on disk.
-        if self.index_path.exists():
+        # skip the save. This prevents a stale in-memory copy from overwriting 
+        # a newer index on disk. We bypass this if 'force' is True (e.g. after deletion).
+        if not force and self.index_path.exists():
             try:
                 disk_index = faiss.read_index(str(self.index_path))
                 if disk_index.ntotal > self._index.ntotal:
                     print(
                         f"[VectorStore] Disk index ({disk_index.ntotal} vectors) is larger than "
-                        f"in-memory ({self._index.ntotal}). Skipping save to protect newer data."
+                        f"in-memory ({self._index.ntotal}). Skipping save to protect newer data. "
+                        f"Use force=True if this is an intentional deletion."
                     )
                     return
             except Exception:

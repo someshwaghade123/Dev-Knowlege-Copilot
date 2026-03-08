@@ -26,7 +26,7 @@ import {
     Alert,
 } from "react-native";
 import * as DocumentPicker from "expo-document-picker";
-import { uploadDocument, listDocuments, uploadText } from "../services/api";
+import { uploadDocument, listDocuments, uploadText, deleteDocument } from "../services/api";
 
 const { height: SCREEN_HEIGHT } = Dimensions.get("window");
 
@@ -89,6 +89,7 @@ export default function UploadSheet({ visible, onClose }: UploadSheetProps) {
 
     const [docs, setDocs] = useState<IndexedDoc[]>([]);
     const [loadingDocs, setLoadingDocs] = useState(false);
+    const [deletingIds, setDeletingIds] = useState<number[]>([]);
 
     const slideAnim = useRef(new Animated.Value(SCREEN_HEIGHT)).current;
 
@@ -173,6 +174,31 @@ export default function UploadSheet({ visible, onClose }: UploadSheetProps) {
         } finally {
             setPasteState("idle");
         }
+    };
+
+    const handleDelete = (doc: IndexedDoc) => {
+        Alert.alert(
+            "Delete Document?",
+            `Are you sure you want to remove \"${doc.file_name}\"? This cannot be undone.`,
+            [
+                { text: "Cancel", style: "cancel" },
+                {
+                    text: "Delete",
+                    style: "destructive",
+                    onPress: async () => {
+                        setDeletingIds(prev => [...prev, doc.id]);
+                        try {
+                            await deleteDocument(doc.id);
+                            loadDocs(); // Refresh list
+                        } catch (err: any) {
+                            Alert.alert("Error", err.message || "Failed to delete document");
+                        } finally {
+                            setDeletingIds(prev => prev.filter(id => id !== doc.id));
+                        }
+                    }
+                }
+            ]
+        );
     };
 
     const handleClose = () => {
@@ -346,9 +372,17 @@ export default function UploadSheet({ visible, onClose }: UploadSheetProps) {
                                                     {doc.chunk_count} chunks • {new Date(doc.ingested_at).toLocaleDateString()}
                                                 </Text>
                                             </View>
-                                            <View style={styles.chunkBadgeSmall}>
-                                                <Text style={styles.chunkBadgeSmallText}>{doc.chunk_count}</Text>
-                                            </View>
+                                            <TouchableOpacity
+                                                style={styles.deleteBtn}
+                                                onPress={() => handleDelete(doc)}
+                                                disabled={deletingIds.includes(doc.id)}
+                                            >
+                                                {deletingIds.includes(doc.id) ? (
+                                                    <ActivityIndicator size="small" color="#ef4444" />
+                                                ) : (
+                                                    <Text style={styles.deleteIcon}>🗑️</Text>
+                                                )}
+                                            </TouchableOpacity>
                                         </View>
                                     ))}
                                 </ScrollView>
@@ -576,4 +610,14 @@ const styles = StyleSheet.create({
     emptyIcon: { fontSize: 48, marginBottom: 12 },
     emptyText: { color: "#94a3b8", fontSize: 17, fontWeight: "600" },
     emptySub: { color: "#475569", fontSize: 13, marginTop: 4 },
+
+    deleteBtn: {
+        padding: 8,
+        marginLeft: 8,
+        borderRadius: 8,
+        backgroundColor: "rgba(239, 68, 68, 0.1)",
+    },
+    deleteIcon: {
+        fontSize: 16,
+    },
 });

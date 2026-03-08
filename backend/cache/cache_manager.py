@@ -58,5 +58,12 @@ class CacheManager:
             self._cache_data.append((expiry, data, query))
             print(f"[Cache] Stored semantic entry for: {query}")
 
+    def clear(self) -> None:
+        """Wipe the semantic cache. Call this after indexing/deleting documents."""
+        with self._lock:
+            self._index = faiss.IndexFlatIP(self.dimension)
+            self._cache_data = []
+            print("[Cache] Semantic cache cleared.")
+
 # Global instance for app-wide use
 cache_manager = CacheManager()
