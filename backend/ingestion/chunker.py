@@ -113,24 +113,44 @@ def chunk_document(text: str, doc_title: str = "") -> list[Chunk]:
 
 def _get_code_blocks(text: str, language: str) -> list[str]:
     """
-    Experimental: Identify logical blocks (classes, functions) in code.
-    This helps keep related logic together in a single chunk.
+    Identify logical blocks (classes, functions) in code using language-family patterns.
+    Falls back to line-splitting for unknown languages.
     """
     blocks = []
     lines = text.split("\n")
     current_block = []
 
-    # Simple regex-based markers for block starts
+    # ── Language family patterns ──────────────────────────────────────────────
     if language == "python":
-        # Python: starts with 'def ' or 'class ' at the beginning of a line
+        # Python: def/class at start of line
         pattern = re.compile(r"^(def|class)\s+\w+")
+
+    elif language in {"ruby", "r"}:
+        # Ruby: 'def', 'class', 'module' / R: function assignment
+        pattern = re.compile(r"^(def|class|module)\s+\w+|^\w+\s*<-\s*function\s*\(")
+
+    elif language in {"rust", "go", "c", "cpp"}:
+        # Rust/Go/C: 'fn', 'func', 'void', type definitions
+        pattern = re.compile(r"^(pub\s+)?(fn|func|void|int|char|struct|enum|impl|type)\s+\w+")
+
+    elif language == "php":
+        # PHP: function, class, interface, trait
+        pattern = re.compile(r"^(function|class|interface|trait)\s+\w+")
+
+    elif language == "lua":
+        # Lua: function keyword
+        pattern = re.compile(r"^(local\s+)?function\s+\w+")
+
     else:
-        # JS/TS: 'function', 'class', 'const/let ... = (...) =>'
-        pattern = re.compile(r"^(export\s+)?(class|function|const|let)\s+\w+")
+        # C-style family: Java, C#, Kotlin, Swift, Scala, JS/TS and similar
+        # Catches class, function, def, fun, func, interface, enum, struct
+        pattern = re.compile(
+            r"^(public|private|protected|static|async|export|abstract|override|open)?\s*"
+            r"(class|interface|enum|struct|fun|func|function|def|void|[A-Z]\w*)\s+\w+"
+        )
 
     for line in lines:
-        if pattern.match(line) and current_block:
-            # New block started, save previous
+        if pattern.match(line.lstrip()) and current_block:
             blocks.append("\n".join(current_block))
             current_block = [line]
         else:
@@ -145,10 +165,21 @@ def _get_code_blocks(text: str, language: str) -> list[str]:
 def chunk_code(text: str, file_name: str, doc_title: str = "") -> list[Chunk]:
     """
     Intelligent code chunking that respects structural boundaries.
+    Routes to the correct language family based on file extension.
     Falls back to token-based chunking if blocks are too large or small.
     """
     ext = Path(file_name).suffix.lower()
-    language = "python" if ext == ".py" else "javascript"
+
+    # Map extension → language family name
+    LANG_MAP = {
+        ".py": "python",
+        ".rb": "ruby", ".r": "r",
+        ".rs": "rust", ".go": "go",
+        ".c": "c", ".h": "c", ".cpp": "cpp", ".cc": "cpp", ".hpp": "cpp",
+        ".php": "php",
+        ".lua": "lua",
+    }
+    language = LANG_MAP.get(ext, "javascript")   # Default: JS/TS/Java/Kotlin/etc.
 
     # 1. Identify raw structural blocks
     raw_blocks = _get_code_blocks(text, language)

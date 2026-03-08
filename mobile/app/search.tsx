@@ -101,16 +101,38 @@ export default function SearchScreen() {
     const handleUpload = async () => {
         try {
             const result = await DocumentPicker.getDocumentAsync({
-                type: ['text/plain', 'text/markdown', '*/*'],
+                type: [
+                    'text/plain', 'text/markdown', 'text/x-python',
+                    'text/javascript', 'text/typescript', 'text/x-rst',
+                    'application/pdf',
+                    'application/vnd.openxmlformats-officedocument.wordprocessingml.document',
+                    'application/vnd.openxmlformats-officedocument.presentationml.presentation',
+                    '*/*'
+                ],
                 copyToCacheDirectory: true,
             });
 
             if (result.canceled) return;
 
             const file = result.assets[0];
+            const SUPPORTED = [
+                // Documents
+                '.md', '.txt', '.rst',
+                // Rich formats
+                '.pdf', '.docx', '.pptx',
+                // Web / Scripting
+                '.py', '.js', '.ts', '.tsx', '.jsx', '.rb', '.php',
+                // JVM / Compiled
+                '.java', '.kt', '.scala', '.cs',
+                // Systems
+                '.go', '.rs', '.c', '.cpp', '.cc', '.h', '.hpp',
+                // Mobile / Other
+                '.swift', '.r', '.lua', '.sh',
+            ];
+            const ext = '.' + file.name.split('.').pop()?.toLowerCase();
 
-            if (!file.name.endsWith('.md') && !file.name.endsWith('.txt')) {
-                Alert.alert("Unsupported File", "Please upload a .txt or .md file.");
+            if (!SUPPORTED.includes(ext)) {
+                Alert.alert("Unsupported File", `Please upload one of: ${SUPPORTED.join(', ')}`);
                 return;
             }
 
