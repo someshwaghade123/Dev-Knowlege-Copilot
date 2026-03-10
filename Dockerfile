@@ -23,9 +23,7 @@ WORKDIR /app
 COPY requirements.txt .
 RUN pip install --no-cache-dir -r requirements.txt
 
-# Pre-download the embedding model so it's baked into the image
-# (avoids slow cold-start on first request)
-RUN python -c "from sentence_transformers import SentenceTransformer; SentenceTransformer('BAAI/bge-small-en-v1.5')"
+
 
 # ── Stage 3: Copy application ─────────────────────────────────────────────────
 COPY backend/ ./backend/
