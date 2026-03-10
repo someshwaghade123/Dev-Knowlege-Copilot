@@ -28,11 +28,3 @@ services:
       # DO NOT commit your actual API key to this file.
       - key: ANTHROPIC_API_KEY
         sync: false 
-        
-    # Persistent Storage for SQLite Database & FAISS Vector Index
-    # IMPORTANT: Persistent disks are ONLY available on paid paid plans (Starter and up).
-    # If using the free tier, uploading new documents will be wiped if the server restarts.
-    disk:
-      name: copilot-data
-      mountPath: /data
-      sizeGB: 1
