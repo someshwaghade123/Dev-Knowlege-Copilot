@@ -34,11 +34,11 @@ COPY data/ ./data/
 RUN mkdir -p /app/data
 
 # ── Runtime configuration ────────────────────────────────────────────────────
-EXPOSE 8001
+EXPOSE 8001 10000
 
 # Health check — Docker will restart the container if this fails 3 times
 HEALTHCHECK --interval=30s --timeout=10s --start-period=20s --retries=3 \
-  CMD python -c "import urllib.request; urllib.request.urlopen('http://localhost:8001/api/v1/health')"
+  CMD python -c "import urllib.request, os; port = os.environ.get('PORT', '8001'); urllib.request.urlopen(f'http://localhost:{port}/api/v1/health')"
 
 # Start the FastAPI server
-CMD ["uvicorn", "backend.main:app", "--host", "0.0.0.0", "--port", "8001"]
+CMD uvicorn backend.main:app --host 0.0.0.0 --port ${PORT:-8001}
