@@ -24,7 +24,7 @@ services:
       - key: STORAGE_DIR
         value: /data # Mount point for persistent disk
       
-      # NOTE: For PRODUCTION, you MUST set ANTHROPIC_API_KEY manually in the Render Dashboard -> Environment tab.
+      # NOTE: For PRODUCTION, you MUST set LLM_API_KEY manually in the Render Dashboard -> Environment tab.
       # DO NOT commit your actual API key to this file.
-      - key: ANTHROPIC_API_KEY
+      - key: LLM_API_KEY
         sync: false 
