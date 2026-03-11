@@ -9,7 +9,7 @@ the relationship between a specific query and a specific chunk.
 """
 
 import threading
-from fastembed import TextCrossEncoder
+from fastembed.rerank.cross_encoder import TextCrossEncoder
 from backend.core.config import settings
 
 class Reranker:
