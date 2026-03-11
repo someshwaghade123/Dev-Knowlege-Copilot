@@ -11,7 +11,7 @@ python-docx==1.2.0             # Word (.docx) extraction
 python-pptx==1.0.2             # PowerPoint (.pptx) extraction
 
 # ── Embeddings ─────────────────────────────────────────────────────────────────
-fastembed==0.2.7               # Lightweight ONNX-based embeddings (No Torch!)
+fastembed>=0.4.2               # Lightweight ONNX-based embeddings and rerankers
 onnxruntime==1.17.1            # Engine for fastembed (CPU)
 numpy<2.0.0                    # Required for compatibility with FAISS
 
