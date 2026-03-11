@@ -2,83 +2,37 @@
 
 A production-grade Retrieval-Augmented Generation (RAG) system built to index technical documentation and provide precise, grounded answers with citations and confidence scores.
 
-## 🚀 Features
+## Features
 
-*   **Hybrid Search**: Combines Dense Vector Search (FAISS/BGE) and Sparse Keyword Search (BM25) with Reciprocal Rank Fusion (RRF) for optimal document retrieval.
+*   **Hybrid Search**: Combines Dense Vector Search (Cohere/FAISS) and Sparse Keyword Search (BM25) with Reciprocal Rank Fusion (RRF) for optimal document retrieval.
 *   **Semantic Caching**: Re-uses prior LLM answers for semantically similar queries (>95% similarity) to reduce latency from ~500ms down to <10ms and save API costs.
-*   **Confidence Scoring & Factuality Guards**: Uses Cross-Encoder (`ms-marco-MiniLM-L-6-v2`) reranking and secondary LLM checks to verify hallucination limits. 
-*   **Concurrency & Rate Limiting**: Built with FastAPI, leveraging `asyncio.run_in_executor` for non-blocking ML operations, protecting endpoints with `slowapi` (20 req/min).
+*   **Confidence Scoring & Factuality Guards**: Uses Cohere API reranking and secondary LLM checks to verify hallucination limits. 
+*   **Concurrency & Rate Limiting**: Built with FastAPI, leveraging asyncio.run_in_executor for non-blocking ML operations, protecting endpoints with slowapi (20 req/min).
 *   **Premium Mobile UI**: Built in React Native (Expo) featuring query skeletons, dynamic metric dashboard pills (Latency, Tokens, Confidence), and robust network retry logic. 
 
-## 🏗️ Architecture
-
-```mermaid
-graph TD
-    subgraph Mobile Client "Expo (React Native)"
-        UI[Search Screen]
-        Metrics[Performance Dashboard]
-    end
-
-    subgraph Backend "FastAPI (Dockerized)"
-        API[v1/query Endpoint]
-        LLM[OpenRouter / Mistral]
-        Ranker[Cross Encoder Re-ranker]
-        
-        subgraph Caching Layer
-            Cache[(Semantic Cache)]
-        end
-        
-        subgraph Search
-            Hyb[Hybrid Search Engine]
-            VecStore[(FAISS Vector Store)]
-            BM25[(BM25 Keyword Index)]
-        end
-    end
-    
-    subgraph Data
-        Docs[(Raw Documents)] 
-        Meta[(SQLite Metadata DB)]
-    end
-
-    %% Flow
-    UI -- "1. User Query" --> API
-    API -- "2. Embed Query & Check" --> Cache
-    Cache -- "Hit > 0.95" --> UI
-    
-    Cache -- "Miss" --> Hyb
-    Hyb -- "Retrieve" --> VecStore
-    Hyb -- "Retrieve" --> BM25
-    Hyb -- "Merge (RRF)" --> Ranker
-    
-    Ranker -- "Top 5 Chunks" --> LLM
-    LLM -- "Synthesize Answer" --> API
-    
-    API -- "Cache Response" --> Cache
-    API -- "JSON payload w/ Citations" --> UI
-```
-
-## 🛠️ Tech Stack
+## Tech Stack
 
 *   **Backend**: Python, FastAPI, Pydantic
-*   **AI/ML**: Sentence-Transformers, rank_bm25, FAISS (CPU)
+*   **AI/ML**: Cohere (Embeddings & Reranking), rank_bm25, FAISS (CPU)
 *   **Database**: SQLite (Metadata & Query Logs)
 *   **Mobile**: React Native, Expo, React-Native-Markdown-Display
 *   **DevOps**: Docker, Docker Compose, Locust (Load Testing)
 
-## ⚡ Quickstart
+## Quickstart
 
 ### Prerequisites
 *   Docker & Docker Compose installed.
-*   An [OpenRouter API Key](https://openrouter.ai/).
+*   An OpenRouter API Key and a Cohere API Key.
 
 ### 1. Clone & Configure
 ```bash
-git clone https://github.com/yourusername/dev-knowledge-copilot.git
-cd dev-knowledge-copilot
+git clone https://github.com/someshwaghade123/Dev-Knowlege-Copilot.git
+cd Dev-Knowlege-Copilot
 ```
-Create a `.env` file in the root directory:
+Create a .env file in the root directory:
 ```env
 LLM_API_KEY=sk-or-v1-...
+COHERE_API_KEY=...
 APP_ENV=production
 LOG_LEVEL=INFO
 SERVER_PORT=8001
@@ -89,8 +43,8 @@ RATE_LIMIT=20/minute
 ```bash
 docker-compose up --build -d
 ```
-The FastAPI server will be available at `http://localhost:8001`.
-You can view the auto-generated Swagger docs at `http://localhost:8001/docs`.
+The FastAPI server will be available at http://localhost:8001.
+You can view the auto-generated Swagger docs at http://localhost:8001/docs.
 
 ### 3. Run the Mobile App
 ```bash
@@ -98,11 +52,11 @@ cd mobile
 npm install
 npx expo start
 ```
-Scan the QR code with the Expo Go app on your phone, or press `a` or `i` to run on a local Android/iOS emulator.
+Scan the QR code with the Expo Go app on your phone, or press a or i to run on a local Android/iOS emulator.
 
-## 📚 API Reference
+## API Reference
 
-### `POST /api/v1/query`
+### POST /api/v1/query
 Main RAG querying endpoint. Includes rate limiting.
 **Request Body**:
 ```json
@@ -130,15 +84,14 @@ Main RAG querying endpoint. Includes rate limiting.
 }
 ```
 
-### `GET /api/v1/health`
-Kubernetes/Docker readiness probe returning the status of the DB and Vector Store.
+### GET /api/v1/health
+Readiness probe returning the status of the DB and Vector Store.
 
-### `GET /api/v1/metrics`
-Returns aggregate performance statistics across all logged queries (p50/p95 latency, total tokens used, and specific pipeline timings for embedding, LLM, and retrieval phases).
+### GET /api/v1/metrics
+Returns aggregate performance statistics across all logged queries (p50/p95 latency, total tokens used, and specific pipeline timings).
 
+## Benchmarking & Load Testing
+The system was load-tested using Locust with 50 concurrent users, achieving 0% failure rate and a median latency of 4ms (powered by the semantic cache).
 
-## 🧪 Benchmarking & Load Testing
-The system was load-tested using **Locust** with **50 concurrent users**, achieving **0% failure rate** and a median latency of **4ms** (powered by the semantic cache). See `docs/week7/load_test.md` for full results.
-
-## 📝 License
+## License
 MIT License
