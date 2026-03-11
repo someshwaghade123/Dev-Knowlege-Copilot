@@ -23,6 +23,9 @@ WORKDIR /app
 COPY requirements.txt .
 RUN pip install --no-cache-dir -r requirements.txt
 
+# Pre-download FastEmbed models to prevent boot-time timeouts (502 errors)
+RUN python -c "from fastembed import TextEmbedding, TextRerank; TextEmbedding(model_name='BAAI/bge-small-en-v1.5'); TextRerank(model_name='BAAI/bge-reranker-base')"
+
 
 
 # ── Stage 3: Copy application ─────────────────────────────────────────────────
