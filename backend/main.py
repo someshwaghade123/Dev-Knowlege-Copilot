@@ -28,6 +28,8 @@ from backend.db.models import init_db
 from backend.retrieval.vector_store import vector_store
 from backend.ingestion.embedder import _get_model as pre_load_embedder
 from backend.retrieval.reranker import reranker
+import gc
+import time
 from slowapi import _rate_limit_exceeded_handler
 from slowapi.errors import RateLimitExceeded
 
@@ -44,11 +46,19 @@ async def lifespan(app: FastAPI):
     print("[Startup] Loading FAISS vector index...")
     vector_store.load_or_create()
 
-    print("[Startup] Pre-loading models...")
-    # These calls initialize the singleton models in the current process
+    print("[Startup] Pre-loading models sequentially to save RAM...")
+    
+    # 1. Load Embedder
+    print("[Startup] Warming Embedder...")
     pre_load_embedder()
-    _ = reranker.model  # Accessing the property triggers the load
-
+    gc.collect()   # Clean up any initialization mess
+    time.sleep(1)  # Brief pause for OS to stabilize
+    
+    # 2. Load Reranker
+    print("[Startup] Warming Reranker...")
+    _ = reranker.model
+    gc.collect()
+    
     print("[Startup] Application ready.")
     yield   # App serves requests between yield and shutdown
 

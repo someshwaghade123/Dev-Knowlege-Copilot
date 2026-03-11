@@ -40,9 +40,5 @@ RUN sed -i 's/\r$//' /app/backend/start.sh && chmod +x /app/backend/start.sh
 # ── Runtime configuration ────────────────────────────────────────────────────
 EXPOSE 8001 10000
 
-# Health check — increased start-period to 120s to allow for initial model download
-HEALTHCHECK --interval=30s --timeout=10s --start-period=120s --retries=3 \
-  CMD python -c "import urllib.request, os; port = os.environ.get('PORT', '8001'); urllib.request.urlopen(f'http://localhost:{port}/api/v1/health')"
-
 # Use the startup script to download models before starting uvicorn
 CMD ["/app/backend/start.sh"]
