@@ -28,62 +28,51 @@ INTERVIEW TIP:
 
 import threading
 import numpy as np
-from sentence_transformers import SentenceTransformer
+from fastembed import TextEmbedding
 from backend.core.config import settings
 
 # ── Singleton model ─────────────────────────────────────────────────────────
-_model: SentenceTransformer | None = None
+_model: TextEmbedding | None = None
 _model_lock = threading.Lock()
 
 
-def _get_model() -> SentenceTransformer:
+def _get_model() -> TextEmbedding:
     """Lazy-load the embedding model with thread safety."""
     global _model
     if _model is None:
         with _model_lock:
             if _model is None:  # Double-checked locking
                 print(f"[Embedder] Loading model: {settings.embed_model}")
-                _model = SentenceTransformer(settings.embed_model)
-                print(f"[Embedder] Model loaded. Output dimension: {settings.embed_dimension}")
+                # fastembed will download to a local cache if not present
+                _model = TextEmbedding(model_name=settings.embed_model)
+                print(f"[Embedder] Model loaded via FastEmbed.")
     return _model
 
 
 def embed_texts(texts: list[str]) -> np.ndarray:
     """
     Embed a list of texts and return a 2D numpy array of shape (N, D).
-
-    Args:
-        texts: List of strings to embed (chunks or queries)
-
-    Returns:
-        float32 numpy array of shape (len(texts), embed_dimension)
-        Each row is the embedding vector for the corresponding text.
-
-    NOTE on BGE query prefix:
-        BGE-small was instruction-tuned. For *documents* being indexed, no
-        prefix is needed. For *queries* at search time, prefix with:
-        "Represent this sentence for searching: "
-        We handle this distinction in vector_store.py.
     """
     model = _get_model()
 
-    # normalize_embeddings=True → L2-normalised vectors
-    # This makes cosine similarity equivalent to dot product — faster with FAISS
-    embeddings = model.encode(
-        texts,
-        normalize_embeddings=True,
-        batch_size=32,        # Process 32 texts at a time (adjust for RAM)
-        show_progress_bar=len(texts) > 50,   # Show bar only for large batches
-    )
-    return embeddings.astype(np.float32)   # FAISS requires float32
+    # fastembed returns a generator of numpy arrays
+    # We convert to a single numpy array
+    # Note: fastembed automatically handles normalization if requested in constructor,
+    # but for BGE it usually returns unit vectors by default or we can manually normalize.
+    # TextEmbedding.embed() returns an iterable of numpy arrays.
+    embeddings_generator = model.embed(texts)
+    embeddings_list = list(embeddings_generator)
+    
+    # Convert to single 2D array and ensure float32 for FAISS
+    embeddings = np.array(embeddings_list).astype(np.float32)
+    return embeddings
 
 
 def embed_query(query: str) -> np.ndarray:
     """
     Embed a single user query with the BGE query-side prefix.
-    Returns a 1D float32 array of shape (embed_dimension,).
     """
-    # The query prefix tells BGE to optimise for retrieval (asymmetric search)
+    # BGE instruction-tuned prefix
     prefixed_query = f"Represent this sentence for searching: {query}"
     embedding = embed_texts([prefixed_query])
     return embedding[0]   # Shape: (384,)
