@@ -23,7 +23,7 @@ except ImportError:
     print('Import from sub-module successful')
 
 TextEmbedding(model_name='BAAI/bge-small-en-v1.5')
-TextCrossEncoder(model_name='BAAI/bge-reranker-base')
+TextCrossEncoder(model_name='Xenova/ms-marco-MiniLM-L-6-v2')
 "
 
 echo "[Startup] Starting Uvicorn server on port ${PORT:-8001}..."
