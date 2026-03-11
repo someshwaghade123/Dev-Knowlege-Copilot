@@ -9,7 +9,15 @@ the relationship between a specific query and a specific chunk.
 """
 
 import threading
-from fastembed import TextCrossEncoder
+try:
+    from fastembed import TextCrossEncoder
+except ImportError:
+    try:
+        from fastembed.rerank.cross_encoder import TextCrossEncoder
+    except ImportError:
+        # If both fail, we'll raise a clear error later during lazy loading
+        TextCrossEncoder = None
+
 from backend.core.config import settings
 
 class Reranker:
@@ -25,6 +33,11 @@ class Reranker:
     @property
     def model(self):
         if self._model is None:
+            if TextCrossEncoder is None:
+                raise ImportError(
+                    "Could not import TextCrossEncoder from fastembed. "
+                    "Ensure fastembed >= 0.4.2 is installed."
+                )
             with self._lock:
                 if self._model is None:  # Double-check
                     print(f"[Reranker] Loading {self.model_name} via FastEmbed...")
