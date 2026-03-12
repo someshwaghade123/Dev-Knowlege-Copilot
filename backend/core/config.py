@@ -28,8 +28,8 @@ class Settings(BaseSettings):
     cohere_api_key: str | None = None
 
     # ── Embeddings ───────────────────────────────────────────────────────────
-    embed_model: str = "text-embedding-3-small"
-    embed_dimension: int = 1536   # Must match text-embedding-3-small
+    embed_model: str = "embed-english-v3.0"
+    embed_dimension: int = 1024   # Must match Cohere embed-english-v3.0
 
     # ── Storage ──────────────────────────────────────────────────────────────
     # We resolve paths as absolute to avoid issues with running from different dirs

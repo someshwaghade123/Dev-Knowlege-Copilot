@@ -28,53 +28,55 @@ INTERVIEW TIP:
 
 import threading
 import numpy as np
-from openai import OpenAI
+import cohere
 from backend.core.config import settings
 
 # ── Singleton client ────────────────────────────────────────────────────────
-_client: OpenAI | None = None
+_client: cohere.Client | None = None
 _client_lock = threading.Lock()
 
 
-def _get_client() -> OpenAI:
-    """Lazy-load the OpenAI client with thread safety."""
+def _get_client() -> cohere.Client:
+    """Lazy-load the Cohere client with thread safety."""
     global _client
     if _client is None:
         with _client_lock:
             if _client is None:
-                if not settings.openai_api_key or "your_" in settings.openai_api_key:
+                if not settings.cohere_api_key or "your_" in settings.cohere_api_key:
                     raise ValueError(
-                        "OPENAI_API_KEY is not set. Please set it in your .env file."
+                        "COHERE_API_KEY is not set. Please set it in your .env file."
                     )
-                _client = OpenAI(api_key=settings.openai_api_key)
+                _client = cohere.Client(api_key=settings.cohere_api_key)
     return _client
 
 
 def _get_model():
-    """Compatibility shim for main.py pre-loading."""
+    """Compatibility shim for main.py."""
     try:
         _get_client()
-        print("[Embedder] OpenAI client initialised.")
+        print("[Embedder] Cohere client initialised.")
     except Exception as e:
-        print(f"[Embedder] Warning: OpenAI client init failed: {e}")
+        print(f"[Embedder] Warning: Cohere client init failed: {e}")
 
 
 def embed_texts(texts: list[str]) -> np.ndarray:
     """
-    Embed a list of texts using OpenAI and return a 2D numpy array.
+    Embed a list of texts using Cohere.
     """
     client = _get_client()
     
-    # OpenAI suggests cleaning newlines for best performance
-    cleaned_texts = [t.replace("\n", " ") for t in texts]
-
-    response = client.embeddings.create(
-        input=cleaned_texts,
-        model=settings.embed_model
+    # Cohere v3 requires 'input_type' for better retrieval performance
+    # 'search_document' for ingestion, 'search_query' for queries
+    # For bulk ingestion, we use search_document
+    response = client.embed(
+        texts=texts,
+        model=settings.embed_model,
+        input_type="search_document",
+        embedding_types=["float"]
     )
     
-    # Extract vectors from response
-    embeddings_list = [item.embedding for item in response.data]
+    # Extract vectors
+    embeddings_list = response.embeddings.float
     
     # Convert to single 2D array and ensure float32 for FAISS
     embeddings = np.array(embeddings_list).astype(np.float32)
@@ -83,9 +85,16 @@ def embed_texts(texts: list[str]) -> np.ndarray:
 
 def embed_query(query: str) -> np.ndarray:
     """
-    Embed a single user query.
-    Note: text-embedding-3-small does not strictly require the BGE prefix,
-    but we keep the interface consistent.
+    Embed a single user query using Cohere.
     """
-    embedding = embed_texts([query])
-    return embedding[0]   # Shape: (1536,)
+    client = _get_client()
+    
+    response = client.embed(
+        texts=[query],
+        model=settings.embed_model,
+        input_type="search_query",
+        embedding_types=["float"]
+    )
+    
+    embedding = np.array(response.embeddings.float[0]).astype(np.float32)
+    return embedding   # Shape: (1024,)
