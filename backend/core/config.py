@@ -21,7 +21,7 @@ class Settings(BaseSettings):
     # ── LLM ─────────────────────────────────────────────────────────────────
     llm_api_key: str
     llm_base_url: str = "https://openrouter.ai/api/v1"
-    llm_model: str = "google/gemini-2.5-flash-lite-preview-09-2025"
+    llm_model: str = "google/gemini-2.0-flash-lite-001"
 
     # ── External APIs ────────────────────────────────────────────────────────
     openai_api_key: str | None = None

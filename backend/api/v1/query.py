@@ -170,5 +170,6 @@ async def query_documents(body: QueryRequest, request: Request):
     except HTTPException:
         raise
     except Exception as e:
-        print(f"[API Error] /query failure: {str(e)}")
-        raise HTTPException(status_code=500, detail=str(e))
+        error_msg = str(e) or repr(e)
+        print(f"[API Error] /query failure: {error_msg}")
+        raise HTTPException(status_code=500, detail=error_msg)
