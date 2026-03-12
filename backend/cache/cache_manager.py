@@ -3,19 +3,20 @@ import threading
 import numpy as np
 import faiss
 from typing import Optional, Any
+from backend.core.config import settings
 
 class CacheManager:
     """
     Manages semantic response caching using vector similarity.
     Uses a lightweight FAISS index to find "near-matches" to previous queries.
     """
-    def __init__(self, dimension: int = 384, ttl_seconds: int = 3600, threshold: float = 0.95):
-        self.dimension = dimension
-        self.ttl = ttl_seconds
-        self.threshold = threshold
+    def __init__(self, dimension: int = None, ttl_seconds: int = None, threshold: float = None):
+        self.dimension = dimension or settings.embed_dimension
+        self.ttl = ttl_seconds or settings.cache_ttl_seconds
+        self.threshold = threshold or settings.cache_similarity_threshold
         
         self._lock = threading.Lock()
-        self._index = faiss.IndexFlatIP(dimension)
+        self._index = faiss.IndexFlatIP(self.dimension)
         self._cache_data = []  # List of (expiry, data, original_query) matching index order
 
     def get(self, query_vector: np.ndarray) -> Optional[dict]:
