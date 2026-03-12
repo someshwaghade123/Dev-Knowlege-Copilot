@@ -21,7 +21,7 @@ class Settings(BaseSettings):
     # ── LLM ─────────────────────────────────────────────────────────────────
     llm_api_key: str
     llm_base_url: str = "https://openrouter.ai/api/v1"
-    llm_model: str = "mistralai/mistral-small-3.1-24b-instruct:free"
+    llm_model: str = "openai/gpt-oss-120b:free"
 
     # ── External APIs ────────────────────────────────────────────────────────
     openai_api_key: str | None = None
