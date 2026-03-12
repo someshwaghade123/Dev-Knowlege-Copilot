@@ -28,40 +28,53 @@ INTERVIEW TIP:
 
 import threading
 import numpy as np
-from fastembed import TextEmbedding
+from openai import OpenAI
 from backend.core.config import settings
 
-# ── Singleton model ─────────────────────────────────────────────────────────
-_model: TextEmbedding | None = None
-_model_lock = threading.Lock()
+# ── Singleton client ────────────────────────────────────────────────────────
+_client: OpenAI | None = None
+_client_lock = threading.Lock()
 
 
-def _get_model() -> TextEmbedding:
-    """Lazy-load the embedding model with thread safety."""
-    global _model
-    if _model is None:
-        with _model_lock:
-            if _model is None:  # Double-checked locking
-                print(f"[Embedder] Loading model: {settings.embed_model}")
-                # fastembed will download to a local cache if not present
-                _model = TextEmbedding(model_name=settings.embed_model)
-                print(f"[Embedder] Model loaded via FastEmbed.")
-    return _model
+def _get_client() -> OpenAI:
+    """Lazy-load the OpenAI client with thread safety."""
+    global _client
+    if _client is None:
+        with _client_lock:
+            if _client is None:
+                if not settings.openai_api_key or "your_" in settings.openai_api_key:
+                    raise ValueError(
+                        "OPENAI_API_KEY is not set. Please set it in your .env file."
+                    )
+                _client = OpenAI(api_key=settings.openai_api_key)
+    return _client
+
+
+def _get_model():
+    """Compatibility shim for main.py pre-loading."""
+    try:
+        _get_client()
+        print("[Embedder] OpenAI client initialised.")
+    except Exception as e:
+        print(f"[Embedder] Warning: OpenAI client init failed: {e}")
 
 
 def embed_texts(texts: list[str]) -> np.ndarray:
     """
-    Embed a list of texts and return a 2D numpy array of shape (N, D).
+    Embed a list of texts using OpenAI and return a 2D numpy array.
     """
-    model = _get_model()
+    client = _get_client()
+    
+    # OpenAI suggests cleaning newlines for best performance
+    cleaned_texts = [t.replace("\n", " ") for t in texts]
 
-    # fastembed returns a generator of numpy arrays
-    # We convert to a single numpy array
-    # Note: fastembed automatically handles normalization if requested in constructor,
-    # but for BGE it usually returns unit vectors by default or we can manually normalize.
-    # TextEmbedding.embed() returns an iterable of numpy arrays.
-    embeddings_generator = model.embed(texts)
-    embeddings_list = list(embeddings_generator)
+    response = client.embeddings.create(
+        input=cleaned_texts,
+        model=settings.embed_model
+    )
+    
+    # Extract vectors from response
+    embeddings_list = [item.embedding for item in response.data]
     
     # Convert to single 2D array and ensure float32 for FAISS
     embeddings = np.array(embeddings_list).astype(np.float32)
@@ -70,9 +83,9 @@ def embed_texts(texts: list[str]) -> np.ndarray:
 
 def embed_query(query: str) -> np.ndarray:
     """
-    Embed a single user query with the BGE query-side prefix.
+    Embed a single user query.
+    Note: text-embedding-3-small does not strictly require the BGE prefix,
+    but we keep the interface consistent.
     """
-    # BGE instruction-tuned prefix
-    prefixed_query = f"Represent this sentence for searching: {query}"
-    embedding = embed_texts([prefixed_query])
-    return embedding[0]   # Shape: (384,)
+    embedding = embed_texts([query])
+    return embedding[0]   # Shape: (1536,)

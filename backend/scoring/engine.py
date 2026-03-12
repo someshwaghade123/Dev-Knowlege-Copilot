@@ -19,12 +19,10 @@ def compute_confidence(scores: list[float], mode: str = "hybrid") -> str:
     top_score = max(scores)
     
     # Thresholds for Cross-Encoder (rerank_score)
-    # Calibrated for ms-marco-MiniLM-L-6-v2 based on debug output.
-    # High: > -7.0
-    # Medium: > -10.0
+    # Calibrated for Cohere Rerank v3 (0-1 range).
     if mode == "rerank":
-        if top_score > -7.0: return "high"
-        if top_score > -10.0: return "medium"
+        if top_score > 0.7: return "high"
+        if top_score > 0.3: return "medium"
         return "low"
         
     # Thresholds for Hybrid (RRF)
