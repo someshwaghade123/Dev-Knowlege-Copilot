@@ -1,7 +1,7 @@
 {
   "expo": {
     "name": "Lumen",
-    "slug": "lumen",
+    "slug": "dev-knowledge-copilot",
     "version": "1.0.0",
     "orientation": "portrait",
     "icon": "./assets/icon.png",
