@@ -1,6 +1,6 @@
 services:
   - type: web
-    name: dev-knowledge-copilot-api
+    name: lumen-api
     env: docker
     region: oregon # You can change this to Ohio or Frankfurt if closer
     plan: free # Note: Free instances spin down after inactivity. Upgrade to Starter ($7/mo) for persistent uptime + disk.
