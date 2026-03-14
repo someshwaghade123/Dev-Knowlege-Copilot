@@ -137,7 +137,7 @@ export default function SearchScreen() {
 
                     {/* Header */}
                     <View style={styles.headerCenter}>
-                        <Text style={styles.header}>🧠 Dev Knowledge Copilot</Text>
+                        <Text style={styles.header}>LUMEN</Text>
                         <Text style={styles.subtitle}>Ask anything about your technical docs</Text>
                     </View>
 

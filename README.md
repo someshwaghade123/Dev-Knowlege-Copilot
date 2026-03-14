@@ -1,4 +1,4 @@
-# Developer Knowledge Copilot
+# Lumen
 
 A production-grade Retrieval-Augmented Generation (RAG) system built to index technical documentation and provide precise, grounded answers with citations and confidence scores.
 

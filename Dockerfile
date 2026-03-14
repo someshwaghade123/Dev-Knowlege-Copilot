@@ -1,6 +1,6 @@
 # syntax=docker/dockerfile:1
 # ─────────────────────────────────────────────────────────────────────────────
-# Dockerfile for the Developer Knowledge Copilot backend
+# Dockerfile for the Lumen backend
 #
 # Build image:  docker build -t dev-copilot:latest .
 # Run locally:  docker run -p 8000:8000 --env-file .env dev-copilot:latest

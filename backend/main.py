@@ -55,7 +55,7 @@ async def lifespan(app: FastAPI):
 
 
 app = FastAPI(
-    title="Developer Knowledge Copilot",
+    title="Lumen",
     description=(
         "A production-grade RAG system that indexes technical documentation "
         "and answers developer queries with citations and confidence scores."

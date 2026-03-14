@@ -1,11 +1,11 @@
 {
   "expo": {
-    "name": "Dev Knowledge Copilot",
-    "slug": "dev-knowledge-copilot",
+    "name": "Lumen",
+    "slug": "lumen",
     "version": "1.0.0",
     "orientation": "portrait",
     "icon": "./assets/icon.png",
-    "scheme": "devcopilot",
+    "scheme": "lumen",
     "userInterfaceStyle": "dark",
     "splash": {
       "image": "./assets/splash.png",
@@ -14,10 +14,10 @@
     },
     "ios": {
       "supportsTablet": false,
-      "bundleIdentifier": "com.devcopilot.app"
+      "bundleIdentifier": "com.lumen.app"
     },
     "android": {
-      "package": "com.devcopilot.app",
+      "package": "com.lumen.app",
       "adaptiveIcon": {
         "backgroundColor": "#0f172a"
       }
