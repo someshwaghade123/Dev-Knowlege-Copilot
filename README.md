@@ -54,6 +54,8 @@ npx expo start
 ```
 Scan the QR code with the Expo Go app on your phone, or press a or i to run on a local Android/iOS emulator.
 
+**Download the APK**: [Lumen Android APK](https://expo.dev/artifacts/eas/s2VFHotGePwR1RPVZSzRCk.apk)
+
 ## API Reference
 
 ### POST /api/v1/query
